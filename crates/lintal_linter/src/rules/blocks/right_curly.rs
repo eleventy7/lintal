@@ -12,9 +12,11 @@ use super::common::are_on_same_line;
 
 /// Policy for placement of right curly braces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum RightCurlyOption {
     /// Right curly should be on same line as next part (else, catch, finally)
     /// or alone if it's the last part.
+    #[default]
     Same,
     /// Right curly must always be alone on its line.
     Alone,
@@ -22,11 +24,6 @@ pub enum RightCurlyOption {
     AloneOrSingleline,
 }
 
-impl Default for RightCurlyOption {
-    fn default() -> Self {
-        Self::Same
-    }
-}
 
 /// Configuration for RightCurly rule.
 #[derive(Debug, Clone)]
@@ -139,13 +136,13 @@ impl RightCurly {
         let mut diagnostics = vec![];
 
         // Find the block (then branch)
-        if let Some(consequence) = node.child_by_field_name("consequence") {
-            if consequence.kind() == "block" {
-                if let Some(rcurly) = Self::find_right_curly(ctx, &consequence) {
+        if let Some(consequence) = node.child_by_field_name("consequence")
+            && consequence.kind() == "block"
+                && let Some(rcurly) = Self::find_right_curly(ctx, &consequence) {
                     if let Some(lcurly) = Self::find_left_curly(ctx, &consequence) {
                         // Check for line break before violation (SAME option)
-                        if self.option == RightCurlyOption::Same {
-                            if !Self::has_line_break_before(ctx, &rcurly)
+                        if self.option == RightCurlyOption::Same
+                            && !Self::has_line_break_before(ctx, &rcurly)
                                 && !are_on_same_line(ctx.source(), &lcurly, &rcurly)
                             {
                                 diagnostics.push(Diagnostic::new(
@@ -157,14 +154,13 @@ impl RightCurly {
                                 // Return early - don't check other violations
                                 return diagnostics;
                             }
-                        }
                     }
 
                     // Check if there's an else clause
                     if let Some(alternative) = node.child_by_field_name("alternative") {
                         // This is not the last block, check SAME logic
-                        if self.option == RightCurlyOption::Same {
-                            if !are_on_same_line(ctx.source(), &rcurly, &alternative) {
+                        if self.option == RightCurlyOption::Same
+                            && !are_on_same_line(ctx.source(), &rcurly, &alternative) {
                                 diagnostics.push(Diagnostic::new(
                                     RightCurlyShouldBeSameLine {
                                         column: Self::get_column(ctx, &rcurly),
@@ -172,16 +168,13 @@ impl RightCurly {
                                     rcurly.range(),
                                 ));
                             }
-                        }
                     }
                 }
-            }
-        }
 
         // If there's an else clause that is a block, check it too
-        if let Some(alternative) = node.child_by_field_name("alternative") {
-            if alternative.kind() == "block" {
-                if let Some(rcurly) = Self::find_right_curly(ctx, &alternative) {
+        if let Some(alternative) = node.child_by_field_name("alternative")
+            && alternative.kind() == "block"
+                && let Some(rcurly) = Self::find_right_curly(ctx, &alternative) {
                     // This is the last block in the if-else chain
                     if self.option == RightCurlyOption::Same {
                         // For SAME option, last block should be alone
@@ -195,8 +188,6 @@ impl RightCurly {
                         }
                     }
                 }
-            }
-        }
 
         diagnostics
     }
@@ -206,9 +197,9 @@ impl RightCurly {
         let mut diagnostics = vec![];
 
         // Find the try block
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(rcurly) = Self::find_right_curly(ctx, &body) {
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+                && let Some(rcurly) = Self::find_right_curly(ctx, &body) {
                     // Check if there's a catch or finally clause
                     let has_next = node
                         .named_children()
@@ -219,8 +210,7 @@ impl RightCurly {
                         if let Some(next) = node
                             .named_children()
                             .find(|c| c.kind() == "catch_clause" || c.kind() == "finally_clause")
-                        {
-                            if !are_on_same_line(ctx.source(), &rcurly, &next) {
+                            && !are_on_same_line(ctx.source(), &rcurly, &next) {
                                 diagnostics.push(Diagnostic::new(
                                     RightCurlyShouldBeSameLine {
                                         column: Self::get_column(ctx, &rcurly),
@@ -228,11 +218,8 @@ impl RightCurly {
                                     rcurly.range(),
                                 ));
                             }
-                        }
                     }
                 }
-            }
-        }
 
         diagnostics
     }
@@ -242,13 +229,13 @@ impl RightCurly {
         let mut diagnostics = vec![];
 
         // Find the catch block
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(rcurly) = Self::find_right_curly(ctx, &body) {
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+                && let Some(rcurly) = Self::find_right_curly(ctx, &body) {
                     if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
                         // Check for line break before violation (SAME option)
-                        if self.option == RightCurlyOption::Same {
-                            if !Self::has_line_break_before(ctx, &rcurly)
+                        if self.option == RightCurlyOption::Same
+                            && !Self::has_line_break_before(ctx, &rcurly)
                                 && !are_on_same_line(ctx.source(), &lcurly, &rcurly)
                             {
                                 diagnostics.push(Diagnostic::new(
@@ -260,46 +247,35 @@ impl RightCurly {
                                 // Return early - don't check other violations
                                 return diagnostics;
                             }
-                        }
                     }
 
-                    // Check if there's a next catch or finally clause by looking at parent
-                    if let Some(parent) = node.parent() {
-                        let siblings: Vec<_> = parent.named_children().collect();
-
-                        // Find current node position
-                        let mut current_pos = None;
-                        for (i, sibling) in siblings.iter().enumerate() {
-                            if sibling.range() == node.range() {
-                                current_pos = Some(i);
-                                break;
-                            }
-                        }
-
-                        if let Some(pos) = current_pos {
-                            // Check if there's a next catch or finally
-                            let has_next = siblings.get(pos + 1).is_some_and(|n| {
-                                n.kind() == "catch_clause" || n.kind() == "finally_clause"
-                            });
-
-                            if has_next && self.option == RightCurlyOption::Same {
-                                if let Some(next) = siblings.get(pos + 1) {
-                                    if !are_on_same_line(ctx.source(), &rcurly, next) {
-                                        diagnostics.push(Diagnostic::new(
-                                            RightCurlyShouldBeSameLine {
-                                                column: Self::get_column(ctx, &rcurly),
-                                            },
-                                            rcurly.range(),
-                                        ));
-                                    }
+                    // Check if there's a next catch or finally clause
+                    // Skip over comments to find the actual next catch/finally
+                    let mut next_sibling = node.next_named_sibling();
+                    while let Some(ref sibling) = next_sibling {
+                        if sibling.kind() == "catch_clause" || sibling.kind() == "finally_clause" {
+                            // Found a catch or finally
+                            if self.option == RightCurlyOption::Same
+                                && !are_on_same_line(ctx.source(), &rcurly, sibling) {
+                                    diagnostics.push(Diagnostic::new(
+                                        RightCurlyShouldBeSameLine {
+                                            column: Self::get_column(ctx, &rcurly),
+                                        },
+                                        rcurly.range(),
+                                    ));
                                 }
-                            }
-                            // Don't check "line.alone" for catch - it's handled by finally
+                            break;
+                        } else if sibling.kind() == "line_comment"
+                            || sibling.kind() == "block_comment"
+                        {
+                            // Skip comments
+                            next_sibling = sibling.next_named_sibling();
+                        } else {
+                            // Some other node, stop looking
+                            break;
                         }
                     }
                 }
-            }
-        }
 
         diagnostics
     }
@@ -309,12 +285,12 @@ impl RightCurly {
         let mut diagnostics = vec![];
 
         // Find the finally block
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(rcurly) = Self::find_right_curly(ctx, &body) {
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+                && let Some(rcurly) = Self::find_right_curly(ctx, &body) {
                     // Finally is always the last in a try-catch-finally chain
-                    if self.option == RightCurlyOption::Same {
-                        if !Self::is_alone_on_line(ctx, &rcurly) {
+                    if self.option == RightCurlyOption::Same
+                        && !Self::is_alone_on_line(ctx, &rcurly) {
                             diagnostics.push(Diagnostic::new(
                                 RightCurlyShouldBeAlone {
                                     column: Self::get_column(ctx, &rcurly),
@@ -322,10 +298,7 @@ impl RightCurly {
                                 rcurly.range(),
                             ));
                         }
-                    }
                 }
-            }
-        }
 
         diagnostics
     }
@@ -333,23 +306,13 @@ impl RightCurly {
     /// Find the right curly brace in a block by searching for the "}" token.
     fn find_right_curly<'a>(_ctx: &CheckContext, block: &'a CstNode<'a>) -> Option<CstNode<'a>> {
         // Look for the closing brace "}" in the block's children
-        for child in block.children() {
-            if child.kind() == "}" {
-                return Some(child);
-            }
-        }
-        None
+        block.children().find(|&child| child.kind() == "}")
     }
 
     /// Find the left curly brace in a block by searching for the "{" token.
     fn find_left_curly<'a>(_ctx: &CheckContext, block: &'a CstNode<'a>) -> Option<CstNode<'a>> {
         // Look for the opening brace "{" in the block's children
-        for child in block.children() {
-            if child.kind() == "{" {
-                return Some(child);
-            }
-        }
-        None
+        block.children().find(|&child| child.kind() == "{")
     }
 
     /// Check if there's a line break before a node (i.e., only whitespace on line before it).

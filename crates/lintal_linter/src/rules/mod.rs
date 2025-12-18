@@ -4,5 +4,5 @@ pub mod blocks;
 pub mod whitespace;
 
 // Re-export all rules
-pub use blocks::*;
+pub use blocks::RightCurly;
 pub use whitespace::*;

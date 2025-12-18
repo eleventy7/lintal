@@ -86,6 +86,12 @@ impl<'a> CstNode<'a> {
         self.children().filter(|c| c.node.is_named())
     }
 
+    pub fn next_named_sibling(&self) -> Option<CstNode<'a>> {
+        self.node
+            .next_named_sibling()
+            .map(|n| CstNode::new(n, self.source))
+    }
+
     /// Get the raw tree-sitter node.
     pub fn inner(&self) -> Node<'a> {
         self.node

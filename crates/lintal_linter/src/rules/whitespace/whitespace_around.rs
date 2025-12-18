@@ -258,11 +258,9 @@ impl Rule for WhitespaceAround {
             }
 
             // Spread parameter (varargs): String... args
-            "spread_parameter" => {
-                if let Some(ellipsis) = find_child_by_kind(node, "...") {
-                    diagnostics.extend(check_whitespace_around(ctx, &ellipsis));
-                }
-            }
+            // Note: ELLIPSIS is NOT in checkstyle's default tokens for WhitespaceAround,
+            // so we don't check whitespace around "..." by default.
+            // "spread_parameter" => { ... }
 
             // Type bounds with & (e.g., T extends A & B)
             "type_bound" => {

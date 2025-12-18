@@ -11,6 +11,6 @@ doctest = false
 [dependencies]
 lintal_java_parser = { path = "../lintal_java_parser" }
 lintal_text_size = { path = "../lintal_text_size" }
-tree-sitter = "0.24"
+tree-sitter = "0.26"
 
 [dev-dependencies]

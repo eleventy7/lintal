@@ -8,7 +8,6 @@
 
 use lintal_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use lintal_java_cst::CstNode;
-use lintal_source_file::{LineIndex, SourceCode};
 use lintal_text_size::{TextRange, TextSize};
 
 use crate::{CheckContext, FromConfig, Properties, Rule};
@@ -121,9 +120,9 @@ fn check_token_whitespace(
     let range = node.range();
     let start = range.start();
 
-    // Get the line and column for this token
-    let line_index = LineIndex::from_source_text(source);
-    let source_code = SourceCode::new(source, &line_index);
+    // Get the line and column for this token using cached line index
+    let line_index = ctx.line_index();
+    let source_code = ctx.source_code();
     let loc = source_code.line_column(start);
 
     // Column is 1-indexed, convert to 0-indexed

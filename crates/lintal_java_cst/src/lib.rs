@@ -71,7 +71,7 @@ impl<'a> CstNode<'a> {
         let count = self.node.child_count();
         let node = self.node;
         (0..count).map(move |i| {
-            let child = node.child(i).unwrap();
+            let child = node.child(i as u32).unwrap();
             CstNode::new(child, source)
         })
     }

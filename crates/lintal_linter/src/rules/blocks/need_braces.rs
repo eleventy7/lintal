@@ -207,8 +207,7 @@ impl NeedBraces {
             return false;
         }
 
-        let line_index = lintal_source_file::LineIndex::from_source_text(ctx.source());
-        let source_code = lintal_source_file::SourceCode::new(ctx.source(), &line_index);
+        let source_code = ctx.source_code();
 
         let start_line = source_code.line_column(node.range().start()).line;
 

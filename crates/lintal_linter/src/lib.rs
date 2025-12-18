@@ -2,8 +2,10 @@
 
 pub mod registry;
 pub mod rules;
+pub mod suppression;
 
 pub use registry::{FromConfig, Properties, RuleRegistry};
+pub use suppression::{PlainTextCommentFilterConfig, SuppressionContext};
 
 use lintal_diagnostics::Diagnostic;
 use lintal_java_cst::CstNode;
@@ -27,6 +29,11 @@ impl<'a> CheckContext<'a> {
     /// Get the source text.
     pub fn source(&self) -> &'a str {
         self.source
+    }
+
+    /// Get the cached line index.
+    pub fn line_index(&self) -> &LineIndex {
+        &self.line_index
     }
 
     /// Get the source code helper for line/column info.

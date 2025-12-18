@@ -80,10 +80,11 @@ impl Rule for EmptyBlock {
         let mut diagnostics = vec![];
 
         // Map node kind to block type name for violation message
+        // Note: catch blocks are handled by EmptyCatchBlock, not EmptyBlock
         let block_type = match node.kind() {
             "while_statement" => Some("while"),
             "try_statement" => Some("try"),
-            "catch_clause" => Some("catch"),
+            // "catch_clause" is NOT checked - handled by EmptyCatchBlock
             "finally" => Some("finally"), // The "finally" keyword itself
             "do_statement" => Some("do"),
             "if_statement" => Some("if"),
@@ -136,7 +137,8 @@ impl Rule for EmptyBlock {
                     None
                 }
             }
-            "array_initializer" => Some("ARRAY_INIT"),
+            // Note: ARRAY_INIT is NOT in checkstyle's default tokens for EmptyBlock.
+            // Empty array initializers {} are allowed by default.
             _ => None,
         };
 
@@ -174,7 +176,7 @@ impl EmptyBlock {
                     .filter(|body| body.kind() == "block")
             }
             "try_statement" => node.child_by_field_name("body"),
-            "catch_clause" => node.child_by_field_name("body"),
+            // "catch_clause" is NOT checked - handled by EmptyCatchBlock
             "finally" => {
                 // The "finally" keyword - get the next sibling which should be the block
                 node.next_named_sibling().filter(|s| s.kind() == "block")
@@ -190,7 +192,6 @@ impl EmptyBlock {
                 // For case/default in switch statements/expressions
                 node.children().find(|c| c.kind() == "block")
             }
-            "array_initializer" => Some(*node),
             _ => None,
         }
     }
@@ -215,11 +216,6 @@ impl EmptyBlock {
                     .children()
                     .any(|c| matches!(c.kind(), "switch_block_statement_group" | "switch_rule"));
                 !has_content
-            }
-            "array_initializer" => {
-                // Array initializer is empty if it has no elements
-                let child_count = block.children().count();
-                child_count <= 2 // Just { and }
             }
             _ => false,
         }

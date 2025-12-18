@@ -138,18 +138,23 @@ impl Rule for NoWhitespaceAfter {
                 }
             }
 
-            // Increment: ++i, i++
+            // Increment: ++i (prefix only, not i++)
             "++" if self.tokens.contains(&NoWhitespaceAfterToken::Inc) => {
-                // Check all increment operators
-                if let Some(ws_range) = self.check_whitespace_after(ctx, node) {
+                // Only check prefix increment - the operator comes BEFORE its operand
+                // For postfix (i++), what follows is the next token, not the operand
+                if is_prefix_update_op(node)
+                    && let Some(ws_range) = self.check_whitespace_after(ctx, node)
+                {
                     diagnostics.push(diag_followed(node, ws_range));
                 }
             }
 
-            // Decrement: --i, i--
+            // Decrement: --i (prefix only, not i--)
             "--" if self.tokens.contains(&NoWhitespaceAfterToken::Dec) => {
-                // Check all decrement operators
-                if let Some(ws_range) = self.check_whitespace_after(ctx, node) {
+                // Only check prefix decrement - the operator comes BEFORE its operand
+                if is_prefix_update_op(node)
+                    && let Some(ws_range) = self.check_whitespace_after(ctx, node)
+                {
                     diagnostics.push(diag_followed(node, ws_range));
                 }
             }
@@ -360,6 +365,21 @@ fn is_array_init(node: &CstNode) -> bool {
 fn is_unary_op(node: &CstNode) -> bool {
     node.parent()
         .is_some_and(|p| p.kind() == "unary_expression")
+}
+
+/// Check if ++ or -- is a prefix operator (++i, not i++).
+/// In tree-sitter, update_expression contains the operator and operand.
+/// For prefix, the operator comes first; for postfix, the operand comes first.
+fn is_prefix_update_op(node: &CstNode) -> bool {
+    if let Some(parent) = node.parent()
+        && parent.kind() == "update_expression"
+    {
+        // If this node is the first child, it's prefix
+        if let Some(first_child) = parent.children().next() {
+            return first_child.range().start() == node.range().start();
+        }
+    }
+    false
 }
 
 /// Check if there's an annotation before the bracket.

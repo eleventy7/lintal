@@ -13,8 +13,12 @@ The project is focused on safely autofixable cases to begin with, and aims for 1
 ## Features
 
 - Reads existing checkstyle.xml configurations
-- Auto-fixes many common violations (whitespace, braces, imports, modifiers)
+- Auto-fixes many common violations (whitespace, brace placement, imports, modifiers)
 - Fast parallel processing
+- Suppression support:
+  - `@SuppressWarnings("checkstyle:RuleName")` annotations
+  - `SuppressWithPlainTextCommentFilter` (`// CHECKSTYLE:OFF:RuleName` comments)
+  - `SuppressWarningsFilter`
 - Optional TOML overlay for fix-specific settings
 
 ## Installation
@@ -62,8 +66,8 @@ lintal currently implements 16 checkstyle rules with 100% compatibility against 
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| LeftCurly | ❌ | 100% compatible |
-| RightCurly | ❌ | 100% compatible |
+| LeftCurly | ✅ (partial) | 100% compatible |
+| RightCurly | ✅ (partial) | 100% compatible |
 | NeedBraces | ❌ | 100% compatible |
 | EmptyBlock | ❌ | 100% compatible |
 | EmptyCatchBlock | ❌ | 100% compatible |

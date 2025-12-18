@@ -1,28 +1,27 @@
 //! Shared helpers for blocks rules.
 
 use lintal_java_cst::CstNode;
-use lintal_source_file::{LineIndex, SourceCode};
 use lintal_text_size::TextSize;
 
+use crate::CheckContext;
+
 /// Check if two nodes are on the same line.
-pub fn are_on_same_line(source: &str, a: &CstNode, b: &CstNode) -> bool {
-    let line_index = LineIndex::from_source_text(source);
-    let source_code = SourceCode::new(source, &line_index);
+pub fn are_on_same_line(ctx: &CheckContext, a: &CstNode, b: &CstNode) -> bool {
+    let source_code = ctx.source_code();
     let a_line = source_code.line_column(a.range().start()).line;
     let b_line = source_code.line_column(b.range().start()).line;
     a_line == b_line
 }
 
 /// Check if a node is alone on its line (only whitespace before it).
-pub fn is_alone_on_line(source: &str, node: &CstNode) -> bool {
-    let line_index = LineIndex::from_source_text(source);
+pub fn is_alone_on_line(ctx: &CheckContext, node: &CstNode) -> bool {
+    let line_index = ctx.line_index();
+    let source_code = ctx.source_code();
     let line_start = line_index.line_start(
-        SourceCode::new(source, &line_index)
-            .line_column(node.range().start())
-            .line,
-        source,
+        source_code.line_column(node.range().start()).line,
+        ctx.source(),
     );
-    let before = &source[usize::from(line_start)..usize::from(node.range().start())];
+    let before = &ctx.source()[usize::from(line_start)..usize::from(node.range().start())];
     before.chars().all(|c| c.is_whitespace())
 }
 
@@ -38,8 +37,9 @@ pub fn has_line_break_before(source: &str, pos: TextSize) -> bool {
 }
 
 /// Get column number (1-indexed) for a node.
-pub fn get_column(source: &str, node: &CstNode) -> usize {
-    let line_index = LineIndex::from_source_text(source);
-    let source_code = SourceCode::new(source, &line_index);
-    source_code.line_column(node.range().start()).column.get()
+pub fn get_column(ctx: &CheckContext, node: &CstNode) -> usize {
+    ctx.source_code()
+        .line_column(node.range().start())
+        .column
+        .get()
 }

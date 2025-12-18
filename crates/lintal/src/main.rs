@@ -5,9 +5,11 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use lintal_checkstyle::{CheckstyleConfig, ConfiguredRule, LintalConfig, MergedConfig};
 use lintal_diagnostics::{Applicability, Diagnostic, Edit};
-use lintal_java_cst::TreeWalker;
+use lintal_java_cst::{CstNode, TreeWalker};
 use lintal_java_parser::JavaParser;
-use lintal_linter::{CheckContext, Rule, RuleRegistry};
+use lintal_linter::{
+    CheckContext, PlainTextCommentFilterConfig, Rule, RuleRegistry, SuppressionContext,
+};
 use lintal_text_size::Ranged;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -69,7 +71,7 @@ fn main() -> Result<()> {
 /// Run the check command.
 fn run_check(paths: &[PathBuf], config_path: Option<&Path>) -> Result<()> {
     // Load configuration
-    let (rules, merged_config) = load_rules(config_path)?;
+    let (rules, merged_config, suppression_filters) = load_rules(config_path)?;
 
     if rules.is_empty() {
         eprintln!("{}", "Warning: No rules configured".yellow());
@@ -89,7 +91,7 @@ fn run_check(paths: &[PathBuf], config_path: Option<&Path>) -> Result<()> {
     let mut total_fixable = 0;
 
     for path in collect_java_files(paths) {
-        let (violations, fixable) = check_file(&path, &rules)?;
+        let (violations, fixable) = check_file(&path, &rules, &suppression_filters)?;
         total_violations += violations;
         total_fixable += fixable;
     }
@@ -115,7 +117,7 @@ fn run_fix(
     diff_only: bool,
     allow_unsafe: bool,
 ) -> Result<()> {
-    let (rules, merged_config) = load_rules(config_path)?;
+    let (rules, merged_config, suppression_filters) = load_rules(config_path)?;
 
     if rules.is_empty() {
         eprintln!("{}", "Warning: No rules configured".yellow());
@@ -143,7 +145,13 @@ fn run_fix(
     let mut files_changed = 0;
 
     for path in collect_java_files(paths) {
-        let (fixed, unfixable, changed) = fix_file(&path, &rules, applicability, diff_only)?;
+        let (fixed, unfixable, changed) = fix_file(
+            &path,
+            &rules,
+            &suppression_filters,
+            applicability,
+            diff_only,
+        )?;
         total_fixed += fixed;
         total_unfixable += unfixable;
         if changed {
@@ -181,6 +189,7 @@ fn run_fix(
 fn fix_file(
     path: &PathBuf,
     rules: &[Box<dyn Rule>],
+    suppression_filters: &[PlainTextCommentFilterConfig],
     applicability: Applicability,
     diff_only: bool,
 ) -> Result<(usize, usize, bool)> {
@@ -194,12 +203,21 @@ fn fix_file(
     };
 
     let ctx = CheckContext::new(&source);
+    let mut suppression_ctx = SuppressionContext::from_source(&source, suppression_filters);
 
-    // Collect all diagnostics
+    // Parse @SuppressWarnings annotations for additional suppressions
+    let root = CstNode::new(result.tree.root_node(), &source);
+    suppression_ctx.parse_suppress_warnings(&source, &root);
+
+    // Collect all diagnostics, filtering out suppressed ones
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
-    for node in TreeWalker::new(result.tree.root_node(), &source) {
+    for node in TreeWalker::new(root.inner(), &source) {
         for rule in rules {
-            diagnostics.extend(rule.check(&ctx, &node));
+            for diagnostic in rule.check(&ctx, &node) {
+                if !suppression_ctx.is_suppressed(rule.name(), diagnostic.range.start()) {
+                    diagnostics.push(diagnostic);
+                }
+            }
         }
     }
 
@@ -402,11 +420,17 @@ fn print_diff(path: &Path, original: &str, fixed: &str) {
 
 /// Load rules from configuration or use defaults.
 #[allow(clippy::type_complexity)]
-fn load_rules(config_path: Option<&Path>) -> Result<(Vec<Box<dyn Rule>>, Option<MergedConfig>)> {
+fn load_rules(
+    config_path: Option<&Path>,
+) -> Result<(
+    Vec<Box<dyn Rule>>,
+    Option<MergedConfig>,
+    Vec<PlainTextCommentFilterConfig>,
+)> {
     let registry = RuleRegistry::builtin();
 
     // Try to load configuration
-    let merged_config = load_config(config_path)?;
+    let (merged_config, suppression_filters) = load_config(config_path)?;
 
     let rules: Vec<Box<dyn Rule>> = match &merged_config {
         Some(config) => {
@@ -426,11 +450,13 @@ fn load_rules(config_path: Option<&Path>) -> Result<(Vec<Box<dyn Rule>>, Option<
         }
     };
 
-    Ok((rules, merged_config))
+    Ok((rules, merged_config, suppression_filters))
 }
 
 /// Load merged configuration from files.
-fn load_config(config_path: Option<&Path>) -> Result<Option<MergedConfig>> {
+fn load_config(
+    config_path: Option<&Path>,
+) -> Result<(Option<MergedConfig>, Vec<PlainTextCommentFilterConfig>)> {
     // Load lintal.toml if it exists
     let lintal = find_lintal_config();
 
@@ -445,7 +471,7 @@ fn load_config(config_path: Option<&Path>) -> Result<Option<MergedConfig>> {
         .or_else(find_checkstyle_config);
 
     let Some(checkstyle_path) = checkstyle_path else {
-        return Ok(None);
+        return Ok((None, vec![]));
     };
 
     if !checkstyle_path.exists() {
@@ -457,7 +483,43 @@ fn load_config(config_path: Option<&Path>) -> Result<Option<MergedConfig>> {
 
     eprintln!("Loaded config from: {}", checkstyle_path.display());
 
-    Ok(Some(MergedConfig::new(&checkstyle, lintal.as_ref())))
+    // Extract suppression filters from config
+    let suppression_filters = extract_suppression_filters(&checkstyle);
+
+    Ok((
+        Some(MergedConfig::new(&checkstyle, lintal.as_ref())),
+        suppression_filters,
+    ))
+}
+
+/// Extract suppression filters from checkstyle config.
+fn extract_suppression_filters(config: &CheckstyleConfig) -> Vec<PlainTextCommentFilterConfig> {
+    let mut filters = vec![];
+
+    // Always add the default checkstyle suppression filter
+    filters.push(PlainTextCommentFilterConfig::checkstyle_default());
+
+    // Look for SuppressWithPlainTextCommentFilter modules
+    for module in &config.modules {
+        if module.name == "SuppressWithPlainTextCommentFilter"
+            && let Some(filter) = create_filter_from_module(module)
+        {
+            filters.push(filter);
+        }
+    }
+
+    filters
+}
+
+/// Create a filter config from a checkstyle module.
+fn create_filter_from_module(
+    module: &lintal_checkstyle::Module,
+) -> Option<PlainTextCommentFilterConfig> {
+    let off_format = module.property("offCommentFormat")?;
+    let on_format = module.property("onCommentFormat")?;
+    let check_format = module.property("checkFormat");
+
+    PlainTextCommentFilterConfig::new(off_format, on_format, check_format)
 }
 
 /// Find lintal.toml in common locations.
@@ -529,7 +591,11 @@ fn collect_java_files(paths: &[PathBuf]) -> Vec<PathBuf> {
     files
 }
 
-fn check_file(path: &PathBuf, rules: &[Box<dyn Rule>]) -> Result<(usize, usize)> {
+fn check_file(
+    path: &PathBuf,
+    rules: &[Box<dyn Rule>],
+    suppression_filters: &[PlainTextCommentFilterConfig],
+) -> Result<(usize, usize)> {
     let source = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
@@ -540,14 +606,24 @@ fn check_file(path: &PathBuf, rules: &[Box<dyn Rule>]) -> Result<(usize, usize)>
     };
 
     let ctx = CheckContext::new(&source);
+    let mut suppression_ctx = SuppressionContext::from_source(&source, suppression_filters);
+
+    // Parse @SuppressWarnings annotations for additional suppressions
+    let root = CstNode::new(result.tree.root_node(), &source);
+    suppression_ctx.parse_suppress_warnings(&source, &root);
 
     let mut violations = 0;
     let mut fixable = 0;
 
-    for node in TreeWalker::new(result.tree.root_node(), &source) {
+    for node in TreeWalker::new(root.inner(), &source) {
         for rule in rules {
             let diagnostics = rule.check(&ctx, &node);
             for diagnostic in diagnostics {
+                // Skip suppressed diagnostics
+                if suppression_ctx.is_suppressed(rule.name(), diagnostic.range.start()) {
+                    continue;
+                }
+
                 violations += 1;
                 if diagnostic.fix.is_some() {
                     fixable += 1;

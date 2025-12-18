@@ -9,8 +9,8 @@ use lintal_diagnostics::Diagnostic;
 use lintal_java_cst::CstNode;
 
 use crate::rules::whitespace::common::{
-    diag_followed, diag_not_followed, diag_not_preceded, diag_preceded, has_whitespace_after,
-    has_whitespace_before, whitespace_range_after, whitespace_range_before,
+    char_after, char_before, diag_followed, diag_not_followed, diag_not_preceded, diag_preceded,
+    has_whitespace_after, has_whitespace_before, whitespace_range_after, whitespace_range_before,
 };
 use crate::{CheckContext, FromConfig, Properties, Rule};
 
@@ -217,7 +217,10 @@ impl Rule for ParenPad {
             // For loops: for (init; cond; update)
             "for_statement" if self.tokens.contains(&ParenPadToken::LiteralFor) => {
                 // For statement has direct lparen/rparen children
-                diagnostics.extend(self.check_parens(ctx, node));
+                // But if the update section is empty (for(;;) or for(init;cond;)),
+                // the whitespace before ) is controlled by EmptyForIteratorPad, not ParenPad
+                let has_empty_iterator = node.child_by_field_name("update").is_none();
+                diagnostics.extend(self.check_for_parens(ctx, node, has_empty_iterator));
             }
 
             // Enhanced for: for (Type item : collection)
@@ -363,17 +366,47 @@ impl ParenPad {
         diagnostics
     }
 
+    /// Check parens of a for statement, with special handling for empty iterator sections.
+    fn check_for_parens(
+        &self,
+        ctx: &CheckContext,
+        node: &CstNode,
+        has_empty_iterator: bool,
+    ) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Find the opening and closing parens
+        let lparen = node.children().find(|c| c.kind() == "(");
+        let rparen = node.children().find(|c| c.kind() == ")");
+
+        if let Some(lparen) = lparen {
+            diagnostics.extend(self.check_lparen(ctx, &lparen));
+        }
+
+        // For the closing paren, skip if the for-iterator is empty
+        // (EmptyForIteratorPad handles the whitespace in that case)
+        if !has_empty_iterator && let Some(rparen) = rparen {
+            diagnostics.extend(self.check_rparen(ctx, &rparen));
+        }
+
+        diagnostics
+    }
+
     /// Check whitespace after opening paren.
     fn check_lparen(&self, ctx: &CheckContext, lparen: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
         let after_pos = lparen.range().end();
 
         // Check if the next char is a closing paren (empty parens)
-        if let Some(next_char) = ctx.source()[usize::from(after_pos)..].chars().next()
-            && next_char == ')'
-        {
-            // Empty parens, don't check
-            return diagnostics;
+        if let Some(next_char) = char_after(ctx.source(), after_pos) {
+            if next_char == ')' {
+                // Empty parens, don't check
+                return diagnostics;
+            }
+            if next_char == '\n' {
+                // Multi-line - checkstyle doesn't flag these
+                return diagnostics;
+            }
         }
 
         let has_space = has_whitespace_after(ctx.source(), after_pos);
@@ -401,12 +434,20 @@ impl ParenPad {
         let before_pos = rparen.range().start();
 
         // Check if the previous char is an opening paren (empty parens)
-        if before_pos > 0.into()
-            && let Some(prev_char) = ctx.source()[..usize::from(before_pos)].chars().last()
+        if let Some(prev_char) = char_before(ctx.source(), before_pos)
             && prev_char == '('
         {
             // Empty parens, don't check
             return diagnostics;
+        }
+
+        // Check if there's a newline in the whitespace before ) (multi-line expression)
+        if let Some(ws_range) = whitespace_range_before(ctx.source(), before_pos) {
+            let ws_text = &ctx.source()[ws_range];
+            if ws_text.contains('\n') {
+                // Multi-line - checkstyle doesn't flag these
+                return diagnostics;
+            }
         }
 
         let has_space = has_whitespace_before(ctx.source(), before_pos);
@@ -562,5 +603,25 @@ mod tests {
                 d.kind.body
             );
         }
+    }
+
+    #[test]
+    fn test_for_empty_iterator() {
+        // For loops with empty update section should NOT be flagged by ParenPad
+        // The space before ) is controlled by EmptyForIteratorPad
+        let diagnostics = check_source("class Foo { void m() { for (int i = 0; i < 10; ) { } } }");
+        let paren_violations: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.kind.body.contains("')'") && d.kind.body.contains("preceded"))
+            .collect();
+
+        assert!(
+            paren_violations.is_empty(),
+            "Should not flag ) in for loop with empty iterator. Found: {:?}",
+            paren_violations
+                .iter()
+                .map(|d| &d.kind.body)
+                .collect::<Vec<_>>()
+        );
     }
 }

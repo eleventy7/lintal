@@ -785,7 +785,7 @@ mod tests {
     fn apply_edits(source: &str, edits: &[Edit]) -> String {
         let mut result = source.to_string();
         let mut sorted = edits.to_vec();
-        sorted.sort_by(|a, b| b.start().cmp(&a.start()));
+        sorted.sort_by_key(|e| std::cmp::Reverse(e.start()));
         for edit in sorted {
             let start = usize::from(edit.start());
             let end = usize::from(edit.end());
@@ -811,8 +811,10 @@ mod tests {
     #[test]
     fn test_left_curly_nlow_fix_moves_brace_to_new_line() {
         let source = "class Foo\nextends Bar {\n    void m() {}\n}\n";
-        let mut rule = LeftCurly::default();
-        rule.option = LeftCurlyOption::Nlow;
+        let rule = LeftCurly {
+            option: LeftCurlyOption::Nlow,
+            ..Default::default()
+        };
         let diagnostics = check_source_with_config(source, &rule);
         let fix = diagnostics
             .iter()

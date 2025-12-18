@@ -878,7 +878,7 @@ mod tests {
     fn apply_edits(source: &str, edits: &[Edit]) -> String {
         let mut result = source.to_string();
         let mut sorted = edits.to_vec();
-        sorted.sort_by(|a, b| b.start().cmp(&a.start()));
+        sorted.sort_by_key(|e| std::cmp::Reverse(e.start()));
         for edit in sorted {
             let start = usize::from(edit.start());
             let end = usize::from(edit.end());
@@ -917,8 +917,10 @@ mod tests {
     #[test]
     fn test_right_curly_alone_or_singleline_fix_moves_else() {
         let source = "class Foo {\n    void m(boolean a) {\n        if (a) {\n            call();\n        } else {\n            other();\n        }\n    }\n}\n";
-        let mut rule = RightCurly::default();
-        rule.option = RightCurlyOption::AloneOrSingleline;
+        let rule = RightCurly {
+            option: RightCurlyOption::AloneOrSingleline,
+            ..Default::default()
+        };
         let diagnostics = check_source_with_config(source, &rule);
         let fix = diagnostics
             .iter()

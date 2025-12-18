@@ -3,8 +3,9 @@
 //! Checks the placement of left curly braces ('{') for code blocks.
 //! This is a port of the checkstyle LeftCurlyCheck for 100% compatibility.
 
-use lintal_diagnostics::{Diagnostic, FixAvailability, Violation};
+use lintal_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use lintal_java_cst::CstNode;
+use lintal_text_size::{TextRange, TextSize};
 
 use crate::{CheckContext, FromConfig, Properties, Rule};
 
@@ -27,6 +28,16 @@ pub enum LeftCurlyOption {
 pub struct LeftCurly {
     pub option: LeftCurlyOption,
     pub ignore_enums: bool,
+}
+
+struct BraceLineInfo {
+    line: lintal_source_file::OneIndexed,
+    line_start: TextSize,
+    line_end: TextSize,
+    line_end_exclusive: TextSize,
+    brace_offset: usize,
+    comment: Option<String>,
+    before_is_whitespace: bool,
 }
 
 impl Default for LeftCurly {
@@ -71,7 +82,7 @@ pub struct LeftCurlyShouldBeOnNewLine {
 }
 
 impl Violation for LeftCurlyShouldBeOnNewLine {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     fn message(&self) -> String {
         format!("'{{' at column {} should be on a new line", self.column)
@@ -85,7 +96,7 @@ pub struct LeftCurlyShouldBeOnPreviousLine {
 }
 
 impl Violation for LeftCurlyShouldBeOnPreviousLine {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     fn message(&self) -> String {
         format!(
@@ -102,7 +113,7 @@ pub struct LeftCurlyShouldHaveLineBreakAfter {
 }
 
 impl Violation for LeftCurlyShouldHaveLineBreakAfter {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     fn message(&self) -> String {
         format!(
@@ -169,6 +180,127 @@ impl Rule for LeftCurly {
 }
 
 impl LeftCurly {
+    fn parse_trailing_comment(after: &str) -> Option<Option<String>> {
+        let trimmed = after.trim_start_matches([' ', '\t']);
+        if trimmed.is_empty() {
+            return Some(None);
+        }
+        if trimmed.starts_with("//") {
+            return Some(Some(trimmed.trim_end().to_string()));
+        }
+        if trimmed.starts_with("/*") {
+            if let Some(end) = trimmed.find("*/") {
+                let (comment, rest) = trimmed.split_at(end + 2);
+                if rest.trim().is_empty() {
+                    return Some(Some(comment.to_string()));
+                }
+            }
+            return None;
+        }
+        None
+    }
+
+    fn brace_line_info(ctx: &CheckContext, brace: &CstNode) -> Option<BraceLineInfo> {
+        let line_index = lintal_source_file::LineIndex::from_source_text(ctx.source());
+        let source_code = lintal_source_file::SourceCode::new(ctx.source(), &line_index);
+        let line = source_code.line_column(brace.range().start()).line;
+        let line_start = line_index.line_start(line, ctx.source());
+        let line_end = line_index.line_end(line, ctx.source());
+        let line_end_exclusive = line_index.line_end_exclusive(line, ctx.source());
+        let line_text = &ctx.source()[usize::from(line_start)..usize::from(line_end_exclusive)];
+        let brace_offset = usize::from(brace.range().start() - line_start);
+        if brace_offset >= line_text.len() {
+            return None;
+        }
+        let before = &line_text[..brace_offset];
+        let before_is_whitespace = before.chars().all(|c| c.is_whitespace());
+        let after = &line_text[brace_offset + 1..];
+        let comment = Self::parse_trailing_comment(after)?;
+        Some(BraceLineInfo {
+            line,
+            line_start,
+            line_end,
+            line_end_exclusive,
+            brace_offset,
+            comment,
+            before_is_whitespace,
+        })
+    }
+
+    fn line_indent(ctx: &CheckContext, pos: TextSize) -> String {
+        let line_index = lintal_source_file::LineIndex::from_source_text(ctx.source());
+        let source_code = lintal_source_file::SourceCode::new(ctx.source(), &line_index);
+        let line = source_code.line_column(pos).line;
+        let line_start = line_index.line_start(line, ctx.source());
+        let prefix = &ctx.source()[usize::from(line_start)..usize::from(pos)];
+        prefix.chars().take_while(|c| c.is_whitespace()).collect()
+    }
+
+    fn fix_move_to_previous_line(&self, ctx: &CheckContext, brace: &CstNode) -> Option<Fix> {
+        let info = Self::brace_line_info(ctx, brace)?;
+        if !info.before_is_whitespace {
+            return None;
+        }
+        if info.line == lintal_source_file::OneIndexed::MIN {
+            return None;
+        }
+        let line_index = lintal_source_file::LineIndex::from_source_text(ctx.source());
+        let prev_line = info.line.saturating_sub(1);
+        let prev_line_start = line_index.line_start(prev_line, ctx.source());
+        let prev_line_end_exclusive = line_index.line_end_exclusive(prev_line, ctx.source());
+        let prev_line_text =
+            &ctx.source()[usize::from(prev_line_start)..usize::from(prev_line_end_exclusive)];
+        let needs_space = prev_line_text
+            .chars()
+            .last()
+            .is_some_and(|c| !c.is_whitespace());
+        let mut insertion = String::new();
+        if needs_space {
+            insertion.push(' ');
+        }
+        insertion.push('{');
+        if let Some(comment) = &info.comment {
+            insertion.push(' ');
+            insertion.push_str(comment);
+        }
+        let delete = Edit::range_deletion(TextRange::new(info.line_start, info.line_end));
+        let insert = Edit::insertion(insertion, prev_line_end_exclusive);
+        Some(Fix::safe_edits(delete, [insert]))
+    }
+
+    fn fix_move_to_new_line(
+        &self,
+        ctx: &CheckContext,
+        brace: &CstNode,
+        start_token: &CstNode,
+    ) -> Option<Fix> {
+        let info = Self::brace_line_info(ctx, brace)?;
+        let line_text =
+            &ctx.source()[usize::from(info.line_start)..usize::from(info.line_end_exclusive)];
+        let mut delete_offset = info.brace_offset;
+        while delete_offset > 0 {
+            let ch = line_text.as_bytes()[delete_offset - 1];
+            if ch == b' ' || ch == b'\t' {
+                delete_offset -= 1;
+            } else {
+                break;
+            }
+        }
+        let delete_start = info.line_start + TextSize::new(delete_offset as u32);
+        let delete = Edit::range_deletion(TextRange::new(delete_start, info.line_end_exclusive));
+        let indent = Self::line_indent(ctx, start_token.range().start());
+        let mut insertion = String::new();
+        insertion.push('\n');
+        insertion.push_str(&indent);
+        insertion.push('{');
+        if let Some(comment) = &info.comment {
+            insertion.push(' ');
+            insertion.push_str(comment);
+        }
+        let insert = Edit::insertion(insertion, info.line_end_exclusive);
+        Some(Fix::safe_edits(delete, [insert]))
+    }
+
     /// Find the left curly brace in a node.
     fn find_left_curly<'a>(_ctx: &CheckContext, node: &'a CstNode<'a>) -> Option<CstNode<'a>> {
         node.children().find(|&child| child.kind() == "{")
@@ -524,32 +656,41 @@ impl LeftCurly {
             LeftCurlyOption::Nl => {
                 // Brace must be on a new line (alone)
                 if !Self::has_whitespace_before(ctx, brace) {
-                    diagnostics.push(Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         LeftCurlyShouldBeOnNewLine {
                             column: Self::get_column(ctx, brace),
                         },
                         brace.range(),
-                    ));
+                    );
+                    if let Some(fix) = self.fix_move_to_new_line(ctx, brace, start_token) {
+                        diagnostic = diagnostic.with_fix(fix);
+                    }
+                    diagnostics.push(diagnostic);
                 }
             }
             LeftCurlyOption::Eol => {
                 // Brace must be at end of line (on same line as statement)
                 if Self::has_whitespace_before(ctx, brace) {
-                    diagnostics.push(Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         LeftCurlyShouldBeOnPreviousLine {
                             column: Self::get_column(ctx, brace),
                         },
                         brace.range(),
-                    ));
+                    );
+                    if let Some(fix) = self.fix_move_to_previous_line(ctx, brace) {
+                        diagnostic = diagnostic.with_fix(fix);
+                    }
+                    diagnostics.push(diagnostic);
                 }
                 // Check line break after - note this can report in addition to "previous line"
                 if !self.has_line_break_after(ctx, brace) {
-                    diagnostics.push(Diagnostic::new(
+                    let diagnostic = Diagnostic::new(
                         LeftCurlyShouldHaveLineBreakAfter {
                             column: Self::get_column(ctx, brace),
                         },
                         brace.range(),
-                    ));
+                    );
+                    diagnostics.push(diagnostic);
                 }
             }
             LeftCurlyOption::Nlow => {
@@ -566,21 +707,29 @@ impl LeftCurly {
                     if brace_line.get() == start_line.get() + 1 {
                         // On next line - check if it has whitespace before (should be alone)
                         if !Self::has_whitespace_before(ctx, brace) {
-                            diagnostics.push(Diagnostic::new(
+                            let mut diagnostic = Diagnostic::new(
                                 LeftCurlyShouldBeOnNewLine {
                                     column: Self::get_column(ctx, brace),
                                 },
                                 brace.range(),
-                            ));
+                            );
+                            if let Some(fix) = self.fix_move_to_new_line(ctx, brace, start_token) {
+                                diagnostic = diagnostic.with_fix(fix);
+                            }
+                            diagnostics.push(diagnostic);
                         }
                     } else if !Self::has_whitespace_before(ctx, brace) {
                         // Multiple lines away and not alone on line
-                        diagnostics.push(Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             LeftCurlyShouldBeOnNewLine {
                                 column: Self::get_column(ctx, brace),
                             },
                             brace.range(),
-                        ));
+                        );
+                        if let Some(fix) = self.fix_move_to_new_line(ctx, brace, start_token) {
+                            diagnostic = diagnostic.with_fix(fix);
+                        }
+                        diagnostics.push(diagnostic);
                     }
                 } else {
                     // On same line - check for line break after (like EOL)
@@ -610,5 +759,93 @@ impl LeftCurly {
         } else {
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lintal_diagnostics::Edit;
+    use lintal_java_cst::TreeWalker;
+    use lintal_java_parser::JavaParser;
+    use lintal_text_size::Ranged;
+
+    fn check_source_with_config(source: &str, rule: &LeftCurly) -> Vec<Diagnostic> {
+        let mut parser = JavaParser::new();
+        let result = parser.parse(source).unwrap();
+        let ctx = CheckContext::new(source);
+
+        let mut diagnostics = vec![];
+        for node in TreeWalker::new(result.tree.root_node(), source) {
+            diagnostics.extend(rule.check(&ctx, &node));
+        }
+        diagnostics
+    }
+
+    fn apply_edits(source: &str, edits: &[Edit]) -> String {
+        let mut result = source.to_string();
+        let mut sorted = edits.to_vec();
+        sorted.sort_by(|a, b| b.start().cmp(&a.start()));
+        for edit in sorted {
+            let start = usize::from(edit.start());
+            let end = usize::from(edit.end());
+            let content = edit.content().unwrap_or("");
+            result.replace_range(start..end, content);
+        }
+        result
+    }
+
+    #[test]
+    fn test_left_curly_eol_fix_moves_brace_with_block_comment() {
+        let source = "class Foo\n{ /*start*/\n    void m() {}\n}\n";
+        let diagnostics = check_source_with_config(source, &LeftCurly::default());
+        let fix = diagnostics
+            .iter()
+            .find_map(|d| d.fix.as_ref())
+            .expect("Expected a fix for left curly EOL");
+        let fixed = apply_edits(source, fix.edits());
+        let expected = "class Foo { /*start*/\n    void m() {}\n}\n";
+        assert_eq!(fixed, expected);
+    }
+
+    #[test]
+    fn test_left_curly_nlow_fix_moves_brace_to_new_line() {
+        let source = "class Foo\nextends Bar {\n    void m() {}\n}\n";
+        let mut rule = LeftCurly::default();
+        rule.option = LeftCurlyOption::Nlow;
+        let diagnostics = check_source_with_config(source, &rule);
+        let fix = diagnostics
+            .iter()
+            .find_map(|d| d.fix.as_ref())
+            .expect("Expected a fix for left curly NLOW");
+        let fixed = apply_edits(source, fix.edits());
+        let expected = "class Foo\nextends Bar\n{\n    void m() {}\n}\n";
+        assert_eq!(fixed, expected);
+    }
+
+    #[test]
+    fn test_left_curly_enum_eol_fix_moves_brace_with_comment() {
+        let source = "enum Foo\n{ /* enum */\n    A;\n}\n";
+        let diagnostics = check_source_with_config(source, &LeftCurly::default());
+        let fix = diagnostics
+            .iter()
+            .find_map(|d| d.fix.as_ref())
+            .expect("Expected a fix for left curly enum EOL");
+        let fixed = apply_edits(source, fix.edits());
+        let expected = "enum Foo { /* enum */\n    A;\n}\n";
+        assert_eq!(fixed, expected);
+    }
+
+    #[test]
+    fn test_left_curly_class_with_modifiers_and_annotation_eol_fix() {
+        let source = "@Deprecated\npublic final class Foo\n{ /* body */\n    void m() {}\n}\n";
+        let diagnostics = check_source_with_config(source, &LeftCurly::default());
+        let fix = diagnostics
+            .iter()
+            .find_map(|d| d.fix.as_ref())
+            .expect("Expected a fix for left curly class EOL");
+        let fixed = apply_edits(source, fix.edits());
+        let expected = "@Deprecated\npublic final class Foo { /* body */\n    void m() {}\n}\n";
+        assert_eq!(fixed, expected);
     }
 }

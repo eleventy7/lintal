@@ -1,5 +1,8 @@
 //! Blocks rules for checking brace placement and block structure.
 
 pub mod common;
+pub mod right_curly;
 
-// Rules will be added as they're implemented
+pub use right_curly::RightCurly;
+
+// Additional rules will be added as they're implemented

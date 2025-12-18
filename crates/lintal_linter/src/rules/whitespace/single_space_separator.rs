@@ -76,10 +76,7 @@ impl Rule for SingleSpaceSeparator {
 
 /// Check if a node is a comment.
 fn is_comment(node: &CstNode) -> bool {
-    matches!(
-        node.kind(),
-        "line_comment" | "block_comment" | "comment"
-    )
+    matches!(node.kind(), "line_comment" | "block_comment" | "comment")
 }
 
 /// Check if there's a comment on the same line as this node.
@@ -198,11 +195,9 @@ fn check_token_whitespace(
         TextSize::new((line_start_offset + column_no) as u32),
     );
 
-    let diagnostic = Diagnostic::new(SingleSpaceSeparatorViolation, diag_range)
-        .with_fix(Fix::safe_edit(Edit::range_replacement(
-            " ".to_string(),
-            fix_range,
-        )));
+    let diagnostic = Diagnostic::new(SingleSpaceSeparatorViolation, diag_range).with_fix(
+        Fix::safe_edit(Edit::range_replacement(" ".to_string(), fix_range)),
+    );
 
     vec![diagnostic]
 }

@@ -125,9 +125,10 @@ impl Rule for NoWhitespaceAfter {
             // Array initializer: int[] a = {}
             "{" if self.tokens.contains(&NoWhitespaceAfterToken::ArrayInit) => {
                 if is_array_init(node)
-                    && let Some(ws_range) = self.check_whitespace_after(ctx, node) {
-                        diagnostics.push(diag_followed(node, ws_range));
-                    }
+                    && let Some(ws_range) = self.check_whitespace_after(ctx, node)
+                {
+                    diagnostics.push(diag_followed(node, ws_range));
+                }
             }
 
             // Annotation: @Override, @SuppressWarnings
@@ -156,17 +157,19 @@ impl Rule for NoWhitespaceAfter {
             // Unary minus: -x
             "-" if self.tokens.contains(&NoWhitespaceAfterToken::UnaryMinus) => {
                 if is_unary_op(node)
-                    && let Some(ws_range) = self.check_whitespace_after(ctx, node) {
-                        diagnostics.push(diag_followed(node, ws_range));
-                    }
+                    && let Some(ws_range) = self.check_whitespace_after(ctx, node)
+                {
+                    diagnostics.push(diag_followed(node, ws_range));
+                }
             }
 
             // Unary plus: +x
             "+" if self.tokens.contains(&NoWhitespaceAfterToken::UnaryPlus) => {
                 if is_unary_op(node)
-                    && let Some(ws_range) = self.check_whitespace_after(ctx, node) {
-                        diagnostics.push(diag_followed(node, ws_range));
-                    }
+                    && let Some(ws_range) = self.check_whitespace_after(ctx, node)
+                {
+                    diagnostics.push(diag_followed(node, ws_range));
+                }
             }
 
             // Bitwise NOT: ~x
@@ -216,9 +219,10 @@ impl Rule for NoWhitespaceAfter {
             // Typecast: (Type) value
             "cast_expression" if self.tokens.contains(&NoWhitespaceAfterToken::Typecast) => {
                 if let Some(rparen) = node.children().find(|c| c.kind() == ")")
-                    && let Some(ws_range) = self.check_whitespace_after(ctx, &rparen) {
-                        diagnostics.push(diag_followed(&rparen, ws_range));
-                    }
+                    && let Some(ws_range) = self.check_whitespace_after(ctx, &rparen)
+                {
+                    diagnostics.push(diag_followed(&rparen, ws_range));
+                }
             }
 
             // Synchronized statement: synchronized(this) {}
@@ -228,9 +232,10 @@ impl Rule for NoWhitespaceAfter {
                     .contains(&NoWhitespaceAfterToken::LiteralSynchronized) =>
             {
                 if let Some(kw) = node.children().find(|c| c.kind() == "synchronized")
-                    && let Some(ws_range) = self.check_whitespace_after(ctx, &kw) {
-                        diagnostics.push(diag_followed(&kw, ws_range));
-                    }
+                    && let Some(ws_range) = self.check_whitespace_after(ctx, &kw)
+                {
+                    diagnostics.push(diag_followed(&kw, ws_range));
+                }
             }
 
             // Method reference: String::new
@@ -414,9 +419,10 @@ fn find_token_before<'a>(
     // find the method identifier instead
     if let Some(ref token) = best
         && token.kind() == ")"
-            && let Some(method_name) = find_method_name_for_paren(token) {
-                return Some(method_name);
-            }
+        && let Some(method_name) = find_method_name_for_paren(token)
+    {
+        return Some(method_name);
+    }
 
     best
 }

@@ -112,7 +112,11 @@ fn count_violation_comments(source: &str) -> usize {
 fn extract_violation_lines(source: &str) -> Vec<usize> {
     let mut lines = vec![];
     for (line_num, line) in source.lines().enumerate() {
-        if line.contains("// violation") || line.contains("// 2 violations") || line.contains("// 3 violations") || line.contains("// 4 violations") {
+        if line.contains("// violation")
+            || line.contains("// 2 violations")
+            || line.contains("// 3 violations")
+            || line.contains("// 4 violations")
+        {
             lines.push(line_num + 1); // 1-indexed
         }
     }

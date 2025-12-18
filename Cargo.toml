@@ -21,9 +21,9 @@ lintal_text_size = { path = "crates/lintal_text_size" }
 lintal_source_file = { path = "crates/lintal_source_file" }
 
 # External dependencies
-tree-sitter = "0.24"
+tree-sitter = "0.26"
 tree-sitter-java = "0.23"
-quick-xml = { version = "0.37", features = ["serialize"] }
+quick-xml = { version = "0.38", features = ["serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 clap = { version = "4.5", features = ["derive"] }

@@ -6,6 +6,10 @@ lintal reads checkstyle.xml configuration files and can automatically fix many v
 
 > **Attribution**: lintal is built on infrastructure from [Ruff](https://github.com/astral-sh/ruff), the extremely fast Python linter by [Astral](https://astral.sh/). We're grateful to the Ruff team for their excellent work that made this project possible.
 
+## Current Status
+
+The project is focused on safely autofixable cases to begin with, and aims for 100% compatibility with Checkstyle. Checkstyle test cases are downloaded during the testing build phase to validate compatibility.
+
 ## Features
 
 - Reads existing checkstyle.xml configurations

@@ -48,8 +48,9 @@ impl RuleRegistry {
 
     /// Register all built-in rules.
     fn register_builtins(&mut self) {
-        use crate::rules::WhitespaceAround;
+        use crate::rules::{WhitespaceAfter, WhitespaceAround};
         self.register::<WhitespaceAround>();
+        self.register::<WhitespaceAfter>();
         // Additional rules will be registered here as they're implemented
     }
 

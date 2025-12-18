@@ -56,13 +56,22 @@ pub fn whitespace_range_before(source: &str, pos: TextSize) -> Option<TextRange>
     let idx = usize::from(pos);
     let before = &source[..idx];
 
-    let ws_len = before.chars().rev().take_while(|c| c.is_whitespace()).count();
+    let ws_len = before
+        .chars()
+        .rev()
+        .take_while(|c| c.is_whitespace())
+        .count();
     if ws_len == 0 {
         return None;
     }
 
     // Count bytes, not chars
-    let ws_bytes: usize = before.chars().rev().take(ws_len).map(|c| c.len_utf8()).sum();
+    let ws_bytes: usize = before
+        .chars()
+        .rev()
+        .take(ws_len)
+        .map(|c| c.len_utf8())
+        .sum();
     let start = TextSize::new((idx - ws_bytes) as u32);
     Some(TextRange::new(start, pos))
 }
@@ -152,16 +161,20 @@ impl Violation for Preceded {
 pub fn diag_not_followed(token: &CstNode) -> Diagnostic {
     let range = token.range();
     let text = token.text().to_string();
-    Diagnostic::new(NotFollowed { token: text }, range)
-        .with_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), range.end())))
+    Diagnostic::new(NotFollowed { token: text }, range).with_fix(Fix::safe_edit(Edit::insertion(
+        " ".to_string(),
+        range.end(),
+    )))
 }
 
 /// Create diagnostic for missing whitespace before token.
 pub fn diag_not_preceded(token: &CstNode) -> Diagnostic {
     let range = token.range();
     let text = token.text().to_string();
-    Diagnostic::new(NotPreceded { token: text }, range)
-        .with_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), range.start())))
+    Diagnostic::new(NotPreceded { token: text }, range).with_fix(Fix::safe_edit(Edit::insertion(
+        " ".to_string(),
+        range.start(),
+    )))
 }
 
 /// Create diagnostic for unexpected whitespace after token.

@@ -61,8 +61,8 @@ impl Rule for AvoidNestedBlocks {
         // - "block" (nested inside another block)
         // - "switch_block_statement_group" (inside a switch case)
         if let Some(parent) = node.parent() {
-            let is_nested = parent.kind() == "block"
-                || parent.kind() == "switch_block_statement_group";
+            let is_nested =
+                parent.kind() == "block" || parent.kind() == "switch_block_statement_group";
 
             if is_nested {
                 // If allowInSwitchCase is true, check if this block has no siblings
@@ -72,10 +72,7 @@ impl Rule for AvoidNestedBlocks {
                 }
 
                 // Report violation
-                diagnostics.push(Diagnostic::new(
-                    NestedBlock,
-                    find_opening_brace(node),
-                ));
+                diagnostics.push(Diagnostic::new(NestedBlock, find_opening_brace(node)));
             }
         }
 

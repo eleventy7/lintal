@@ -41,28 +41,33 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-### Auto-fixable (Safe)
+lintal currently implements 16 checkstyle rules with 100% compatibility against checkstyle's own test suite.
 
-- WhitespaceAround
-- WhitespaceAfter
-- NoWhitespaceBefore
-- NoWhitespaceAfter
-- SingleSpaceSeparator
-- ParenPad
-- TypecastParenPad
-- LeftCurly
-- RightCurly
-- NeedBraces
-- ModifierOrder
-- RedundantModifier
-- FinalParameters
-- FinalLocalVariable
-- UpperEll
-- ArrayTypeStyle
+### Whitespace (10 rules)
 
-### Check-only
+| Rule | Auto-fix | Status |
+|------|----------|--------|
+| WhitespaceAround | ✅ | 100% compatible |
+| WhitespaceAfter | ✅ | 100% compatible |
+| NoWhitespaceAfter | ✅ | 100% compatible |
+| NoWhitespaceBefore | ✅ | 100% compatible |
+| SingleSpaceSeparator | ✅ | 100% compatible |
+| ParenPad | ✅ | 100% compatible |
+| TypecastParenPad | ✅ | 100% compatible |
+| MethodParamPad | ✅ | 100% compatible |
+| EmptyForInitializerPad | ✅ | 100% compatible |
+| FileTabCharacter | ✅ | 100% compatible |
 
-All other checkstyle rules are supported for detection but require manual fixes.
+### Blocks (6 rules)
+
+| Rule | Auto-fix | Status |
+|------|----------|--------|
+| LeftCurly | ❌ | 100% compatible |
+| RightCurly | ❌ | 100% compatible |
+| NeedBraces | ❌ | 100% compatible |
+| EmptyBlock | ❌ | 100% compatible |
+| EmptyCatchBlock | ❌ | 100% compatible |
+| AvoidNestedBlocks | ❌ | 100% compatible |
 
 ## Development
 

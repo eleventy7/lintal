@@ -104,7 +104,9 @@ fn test_avoid_nested_blocks_default() {
 
 #[test]
 fn test_avoid_nested_blocks_allow_in_switch_case() {
-    let Some(source) = load_avoidnestedblocks_fixture("InputAvoidNestedBlocksAllowInSwitchCase.java") else {
+    let Some(source) =
+        load_avoidnestedblocks_fixture("InputAvoidNestedBlocksAllowInSwitchCase.java")
+    else {
         eprintln!("Skipping test - checkstyle repo not available");
         return;
     };

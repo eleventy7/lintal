@@ -324,11 +324,12 @@ impl LeftCurly {
         });
 
         if let Some(body) = body
-            && let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                // Skip modifier annotations to find the start token
-                let start_token = Self::skip_modifier_annotations(node);
-                diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
-            }
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            // Skip modifier annotations to find the start token
+            let start_token = Self::skip_modifier_annotations(node);
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
+        }
 
         diagnostics
     }
@@ -340,10 +341,11 @@ impl LeftCurly {
         // Find the block or constructor_body
         if let Some(body) = node.child_by_field_name("body")
             && (body.kind() == "block" || body.kind() == "constructor_body")
-                && let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    let start_token = Self::skip_modifier_annotations(node);
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
-                }
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            let start_token = Self::skip_modifier_annotations(node);
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
+        }
 
         diagnostics
     }

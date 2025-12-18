@@ -123,7 +123,9 @@ impl EmptyCatchBlock {
     /// Get the exception variable name from a catch clause.
     fn get_exception_variable_name(&self, catch_node: &CstNode) -> String {
         // Find the catch_formal_parameter
-        if let Some(param) = catch_node.children().find(|c| c.kind() == "catch_formal_parameter")
+        if let Some(param) = catch_node
+            .children()
+            .find(|c| c.kind() == "catch_formal_parameter")
         {
             // Find the identifier
             if let Some(ident) = param.children().find(|c| c.kind() == "identifier") {

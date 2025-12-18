@@ -36,14 +36,6 @@ impl Violation {
             message_key: "line.previous",
         }
     }
-
-    fn line_break_after(line: usize, column: usize) -> Self {
-        Self {
-            line,
-            column,
-            message_key: "line.break.after",
-        }
-    }
 }
 
 /// Run LeftCurly rule with custom config on source and collect violations.
@@ -116,7 +108,7 @@ fn test_default_option() {
 
     // Expected violations from checkstyle test (see LeftCurlyCheckTest.java:testDefault)
     let expected = vec![
-        Violation::line_previous(17, 1),  // Top-level class
+        Violation::line_previous(17, 1), // Top-level class
         Violation::line_previous(19, 5),
         Violation::line_previous(23, 5),
         Violation::line_previous(27, 5),

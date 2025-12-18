@@ -105,7 +105,8 @@ fn test_empty_catch_block_with_user_set_values() {
     };
 
     // Custom: exceptionVariableName = expected|ignore|myException, commentFormat = This is expected
-    let violations = check_empty_catch_block(&source, "expected|ignore|myException", "This is expected");
+    let violations =
+        check_empty_catch_block(&source, "expected|ignore|myException", "This is expected");
 
     let expected = vec![
         Violation::new(26, 31, "Empty catch block."),

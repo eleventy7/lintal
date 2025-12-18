@@ -185,19 +185,19 @@ fn test_no_whitespace_before_default() {
 
     // Expected violations from checkstyle test (line 34 onwards based on test output)
     let expected = vec![
-        (34, "++"),  // b ++
-        (34, "--"),  // b --
-        (180, ";"),  // doStuff() ;
-        (182, ";"),  // for (int i = 0 ; i < 5; i++)
-        (189, ";"),  // private int i ;
-        (191, ";"),  // private int i1, i2, i3 ;
-        (199, ";"),  // private int j ;
-        (215, ";"),  // void foo() ;
-        (270, ";"),  // .run() ;
-        (274, ";"),  // return ;
-        (288, ";"),  // ) ;
+        (34, "++"),   // b ++
+        (34, "--"),   // b --
+        (180, ";"),   // doStuff() ;
+        (182, ";"),   // for (int i = 0 ; i < 5; i++)
+        (189, ";"),   // private int i ;
+        (191, ";"),   // private int i1, i2, i3 ;
+        (199, ";"),   // private int j ;
+        (215, ";"),   // void foo() ;
+        (270, ";"),   // .run() ;
+        (274, ";"),   // return ;
+        (288, ";"),   // ) ;
         (291, "..."), // String ... args
-        (295, ":"),  // label1 :
+        (295, ":"),   // label1 :
     ];
 
     for (line, token) in &expected {
@@ -409,8 +409,8 @@ fn test_no_whitespace_before_ellipsis() {
     let expected = vec![
         // (25, "..."), // @C [] @B ... arg - NOT DETECTED (annotation before ellipsis)
         (28, "..."), // @C []    ... arg - DETECTED (no annotation before ellipsis)
-        // (31, "..."), // [] @B ... arg - NOT DETECTED (annotation before ellipsis)
-        // (34, "..."), // [] @B ... arg - NOT DETECTED (annotation before ellipsis)
+                     // (31, "..."), // [] @B ... arg - NOT DETECTED (annotation before ellipsis)
+                     // (34, "..."), // [] @B ... arg - NOT DETECTED (annotation before ellipsis)
     ];
 
     for (line, token) in &expected {
@@ -438,7 +438,10 @@ fn test_no_whitespace_before_ellipsis() {
             .collect::<Vec<_>>()
     );
 
-    println!("Test passed: found {} violations (note: some cases with type annotations not detected due to parser limitations)", violations.len());
+    println!(
+        "Test passed: found {} violations (note: some cases with type annotations not detected due to parser limitations)",
+        violations.len()
+    );
 }
 
 // =============================================================================
@@ -509,15 +512,13 @@ fn test_post_increment_without_space() {
 fn test_pre_increment_not_flagged() {
     let violations = check_no_whitespace_before("class Foo { void m() { int i = 0; ++i; } }");
     let inc_violations: Vec<_> = violations.iter().filter(|v| v.token == "++").collect();
-    assert!(
-        inc_violations.is_empty(),
-        "Should not flag pre-increment"
-    );
+    assert!(inc_violations.is_empty(), "Should not flag pre-increment");
 }
 
 #[test]
 fn test_all_diagnostics_have_fixes() {
-    let violations = check_no_whitespace_before("class Foo { void m(int a , int b) { int x = 1 ; } }");
+    let violations =
+        check_no_whitespace_before("class Foo { void m(int a , int b) { int x = 1 ; } }");
     // We can't easily check fixes here without more infrastructure,
     // but we can at least verify we got violations
     assert!(!violations.is_empty(), "Should have violations");

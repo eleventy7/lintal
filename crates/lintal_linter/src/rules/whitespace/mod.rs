@@ -1,6 +1,7 @@
 //! Whitespace-related rules.
 
 pub mod common;
+pub mod empty_for_initializer_pad;
 pub mod method_param_pad;
 pub mod no_whitespace_after;
 pub mod no_whitespace_before;
@@ -9,6 +10,7 @@ pub mod single_space_separator;
 pub mod whitespace_after;
 mod whitespace_around;
 
+pub use empty_for_initializer_pad::EmptyForInitializerPad;
 pub use method_param_pad::MethodParamPad;
 pub use no_whitespace_after::NoWhitespaceAfter;
 pub use no_whitespace_before::NoWhitespaceBefore;

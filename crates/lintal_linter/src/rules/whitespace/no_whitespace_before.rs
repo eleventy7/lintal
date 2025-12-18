@@ -243,7 +243,11 @@ impl NoWhitespaceBefore {
     }
 
     /// Check if whitespace should be reported based on allow_line_breaks setting.
-    fn should_report_whitespace(&self, source: &str, ws_range: lintal_text_size::TextRange) -> bool {
+    fn should_report_whitespace(
+        &self,
+        source: &str,
+        ws_range: lintal_text_size::TextRange,
+    ) -> bool {
         // Check if token is at start of file
         if ws_range.start() == TextSize::new(0) {
             // If allowLineBreaks is true, this is OK
@@ -347,10 +351,7 @@ fn is_in_empty_for_initializer_or_condition(semi: &CstNode) -> bool {
             // We need to check if semi is the first or second semicolon in an empty slot
 
             // Get all semicolons in the for statement
-            let semis: Vec<_> = node
-                .children()
-                .filter(|c| c.kind() == ";")
-                .collect();
+            let semis: Vec<_> = node.children().filter(|c| c.kind() == ";").collect();
 
             if semis.len() >= 2 {
                 let is_first_semi = semis[0].range() == semi.range();
@@ -491,10 +492,7 @@ mod tests {
             .iter()
             .filter(|d| d.kind.body.contains("++"))
             .collect();
-        assert!(
-            inc_violations.is_empty(),
-            "Should not flag pre-increment"
-        );
+        assert!(inc_violations.is_empty(), "Should not flag pre-increment");
     }
 
     #[test]
@@ -504,7 +502,8 @@ mod tests {
         config.tokens.insert(NoWhitespaceBeforeToken::Semi);
         config.allow_line_breaks = true;
 
-        let diagnostics = check_source_with_config("class Foo { void m() { for (; ; ) {} } }", &config);
+        let diagnostics =
+            check_source_with_config("class Foo { void m() { for (; ; ) {} } }", &config);
         let semi_violations: Vec<_> = diagnostics
             .iter()
             .filter(|d| d.kind.body.contains(";"))

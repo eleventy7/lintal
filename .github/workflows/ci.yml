@@ -73,4 +73,14 @@ jobs:
           key: checkstyle-12.3.0-${{ hashFiles('crates/lintal_linter/tests/checkstyle_repo.rs') }}
 
       - name: Run compatibility tests
-        run: cargo test --package lintal_linter --test checkstyle_compat
+        run: |
+          cargo test --package lintal_linter --test checkstyle_compat
+          cargo test --package lintal_linter --test checkstyle_whitespaceafter
+          cargo test --package lintal_linter --test checkstyle_parenpad
+          cargo test --package lintal_linter --test checkstyle_nowhitespaceafter
+          cargo test --package lintal_linter --test checkstyle_singlespaceseparator
+          cargo test --package lintal_linter --test checkstyle_methodparampad
+          cargo test --package lintal_linter --test checkstyle_nowhitespacebefore
+          cargo test --package lintal_linter --test checkstyle_emptyforinitializerpad
+          cargo test --package lintal_linter --test checkstyle_typecastparenpad
+          cargo test --package lintal_linter --test checkstyle_filetabcharacter

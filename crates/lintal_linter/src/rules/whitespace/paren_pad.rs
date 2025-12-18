@@ -15,13 +15,16 @@ use crate::rules::whitespace::common::{
 use crate::{CheckContext, FromConfig, Properties, Rule};
 
 /// Tokens that can be checked by ParenPad.
+///
+/// Note: Checkstyle's DOT token is not included here because tree-sitter doesn't have
+/// a "DOT" node type. Method chains like `obj.method(args)` are represented as
+/// `method_invocation` nodes, which are already handled by the MethodCall token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ParenPadToken {
     Annotation,
     AnnotationFieldDef,
     CtorCall,
     CtorDef,
-    Dot,
     EnumConstantDef,
     Expr,
     LiteralCatch,
@@ -48,7 +51,6 @@ impl ParenPadToken {
             "ANNOTATION_FIELD_DEF" => Some(Self::AnnotationFieldDef),
             "CTOR_CALL" => Some(Self::CtorCall),
             "CTOR_DEF" => Some(Self::CtorDef),
-            "DOT" => Some(Self::Dot),
             "ENUM_CONSTANT_DEF" => Some(Self::EnumConstantDef),
             "EXPR" => Some(Self::Expr),
             "LITERAL_CATCH" => Some(Self::LiteralCatch),
@@ -103,7 +105,6 @@ impl Default for ParenPad {
         tokens.insert(ParenPadToken::AnnotationFieldDef);
         tokens.insert(ParenPadToken::CtorCall);
         tokens.insert(ParenPadToken::CtorDef);
-        tokens.insert(ParenPadToken::Dot);
         tokens.insert(ParenPadToken::EnumConstantDef);
         tokens.insert(ParenPadToken::Expr);
         tokens.insert(ParenPadToken::LiteralCatch);
@@ -139,7 +140,7 @@ impl FromConfig for ParenPad {
             .unwrap_or(ParenPadOption::NoSpace);
 
         let tokens_str = properties.get("tokens").copied().unwrap_or(
-            "ANNOTATION, ANNOTATION_FIELD_DEF, CTOR_CALL, CTOR_DEF, DOT, \
+            "ANNOTATION, ANNOTATION_FIELD_DEF, CTOR_CALL, CTOR_DEF, \
              ENUM_CONSTANT_DEF, EXPR, LITERAL_CATCH, LITERAL_DO, LITERAL_FOR, LITERAL_IF, \
              LITERAL_NEW, LITERAL_SWITCH, LITERAL_SYNCHRONIZED, LITERAL_WHILE, METHOD_CALL, \
              METHOD_DEF, QUESTION, RESOURCE_SPECIFICATION, SUPER_CTOR_CALL, LAMBDA, RECORD_DEF",

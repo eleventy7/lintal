@@ -33,22 +33,6 @@ impl Violation {
             message: "')' is preceded by whitespace".to_string(),
         }
     }
-
-    fn not_followed(line: usize, column: usize) -> Self {
-        Self {
-            line,
-            column,
-            message: "'(' is not followed by whitespace".to_string(),
-        }
-    }
-
-    fn not_preceded(line: usize, column: usize) -> Self {
-        Self {
-            line,
-            column,
-            message: "')' is not preceded by whitespace".to_string(),
-        }
-    }
 }
 
 /// Configuration for ParenPad rule matching checkstyle options.
@@ -100,9 +84,6 @@ impl ParenPadConfig {
                     }
                     "CTOR_DEF" => {
                         token_set.insert(ParenPadToken::CtorDef);
-                    }
-                    "DOT" => {
-                        token_set.insert(ParenPadToken::Dot);
                     }
                     "ENUM_CONSTANT_DEF" => {
                         token_set.insert(ParenPadToken::EnumConstantDef);
@@ -210,22 +191,6 @@ fn check_paren_pad_with_config(source: &str, config: &ParenPadConfig) -> Vec<Vio
 fn load_fixture(file_name: &str) -> Option<String> {
     let path = checkstyle_repo::whitespace_test_input("parenpad", file_name)?;
     std::fs::read_to_string(&path).ok()
-}
-
-/// Helper to verify violations match expected.
-fn verify_violations(violations: &[Violation], expected: &[Violation]) -> bool {
-    for exp in expected {
-        if !violations.iter().any(|v| {
-            v.line == exp.line && v.column == exp.column && v.message.contains(&exp.message)
-        }) {
-            println!(
-                "Missing expected violation at {}:{}: {}",
-                exp.line, exp.column, exp.message
-            );
-            return false;
-        }
-    }
-    true
 }
 
 /// Print violation details for debugging.

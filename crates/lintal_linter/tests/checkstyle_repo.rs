@@ -37,6 +37,7 @@ pub fn checkstyle_repo() -> Option<PathBuf> {
 }
 
 /// Get path to a checkstyle test input file for any whitespace check.
+#[allow(dead_code)]
 pub fn whitespace_test_input(check_name: &str, file_name: &str) -> Option<PathBuf> {
     let repo = checkstyle_repo()?;
     let path = repo

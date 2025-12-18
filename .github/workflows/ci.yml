@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -84,3 +87,9 @@ jobs:
           cargo test --package lintal_linter --test checkstyle_emptyforinitializerpad
           cargo test --package lintal_linter --test checkstyle_typecastparenpad
           cargo test --package lintal_linter --test checkstyle_filetabcharacter
+          cargo test --package lintal_linter --test checkstyle_rightcurly
+          cargo test --package lintal_linter --test checkstyle_leftcurly
+          cargo test --package lintal_linter --test checkstyle_needbraces
+          cargo test --package lintal_linter --test checkstyle_emptyblock
+          cargo test --package lintal_linter --test checkstyle_emptycatchblock
+          cargo test --package lintal_linter --test checkstyle_avoidnestedblocks

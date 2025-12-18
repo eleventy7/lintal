@@ -207,8 +207,11 @@ impl LeftCurly {
                 // For SLIST (statement list blocks), get first child of the block
                 // This is the first statement or }
                 parent.named_children().next()
-            } else if parent.kind() == "class_body" || parent.kind() == "enum_body"
-                   || parent.kind() == "interface_body" || parent.kind() == "annotation_type_body" {
+            } else if parent.kind() == "class_body"
+                || parent.kind() == "enum_body"
+                || parent.kind() == "interface_body"
+                || parent.kind() == "annotation_type_body"
+            {
                 // For OBJBLOCK (class/enum/interface bodies)
                 // Only check if ignoreEnums is false and it's an enum
                 if !self.ignore_enums {
@@ -298,7 +301,10 @@ impl LeftCurly {
         let mut diagnostics = vec![];
 
         // For enums, check if we should ignore them
-        if node.kind() == "enum_declaration" && self.ignore_enums && self.option == LeftCurlyOption::Eol {
+        if node.kind() == "enum_declaration"
+            && self.ignore_enums
+            && self.option == LeftCurlyOption::Eol
+        {
             return diagnostics;
         }
 
@@ -313,12 +319,12 @@ impl LeftCurly {
             })
         });
 
-        if let Some(body) = body {
-            if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                // Skip modifier annotations to find the start token
-                let start_token = Self::skip_modifier_annotations(node);
-                diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
-            }
+        if let Some(body) = body
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            // Skip modifier annotations to find the start token
+            let start_token = Self::skip_modifier_annotations(node);
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
         }
 
         diagnostics
@@ -329,13 +335,12 @@ impl LeftCurly {
         let mut diagnostics = vec![];
 
         // Find the block
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    let start_token = Self::skip_modifier_annotations(node);
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            let start_token = Self::skip_modifier_annotations(node);
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, &start_token));
         }
 
         diagnostics
@@ -346,24 +351,22 @@ impl LeftCurly {
         let mut diagnostics = vec![];
 
         // Check consequence (then block)
-        if let Some(consequence) = node.child_by_field_name("consequence") {
-            if consequence.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &consequence) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(consequence) = node.child_by_field_name("consequence")
+            && consequence.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &consequence)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         // Check alternative (else block)
-        if let Some(alternative) = node.child_by_field_name("alternative") {
-            if alternative.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &alternative) {
-                    // Find the "else" keyword
-                    let else_keyword = node.children().find(|c| c.kind() == "else");
-                    let start = else_keyword.unwrap_or(*node);
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, &start));
-                }
-            }
+        if let Some(alternative) = node.child_by_field_name("alternative")
+            && alternative.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &alternative)
+        {
+            // Find the "else" keyword
+            let else_keyword = node.children().find(|c| c.kind() == "else");
+            let start = else_keyword.unwrap_or(*node);
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, &start));
         }
 
         diagnostics
@@ -373,12 +376,11 @@ impl LeftCurly {
     fn check_loop_statement(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
 
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -388,12 +390,11 @@ impl LeftCurly {
     fn check_try_statement(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
 
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -403,12 +404,11 @@ impl LeftCurly {
     fn check_catch_clause(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
 
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -418,12 +418,11 @@ impl LeftCurly {
     fn check_finally_clause(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
 
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -433,12 +432,11 @@ impl LeftCurly {
     fn check_static_init(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
 
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -448,12 +446,11 @@ impl LeftCurly {
     fn check_lambda(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
 
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -463,12 +460,11 @@ impl LeftCurly {
     fn check_switch(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
 
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "switch_block" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "switch_block"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -479,12 +475,12 @@ impl LeftCurly {
         let mut diagnostics = vec![];
 
         // Look for a block in the case statement
-        if let Some(block) = node.children().find(|c| c.kind() == "block") {
-            if let Some(lcurly) = Self::find_left_curly(ctx, &block) {
-                // The start token is the case/default label
-                let start = node.children().next().unwrap_or(*node);
-                diagnostics.extend(self.verify_brace(ctx, &lcurly, &start));
-            }
+        if let Some(block) = node.children().find(|c| c.kind() == "block")
+            && let Some(lcurly) = Self::find_left_curly(ctx, &block)
+        {
+            // The start token is the case/default label
+            let start = node.children().next().unwrap_or(*node);
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, &start));
         }
 
         diagnostics
@@ -495,12 +491,11 @@ impl LeftCurly {
         let mut diagnostics = vec![];
 
         // Look for a class_body in the enum constant
-        if let Some(body) = node.child_by_field_name("body") {
-            if body.kind() == "class_body" {
-                if let Some(lcurly) = Self::find_left_curly(ctx, &body) {
-                    diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
-                }
-            }
+        if let Some(body) = node.child_by_field_name("body")
+            && body.kind() == "class_body"
+            && let Some(lcurly) = Self::find_left_curly(ctx, &body)
+        {
+            diagnostics.extend(self.verify_brace(ctx, &lcurly, node));
         }
 
         diagnostics
@@ -559,7 +554,8 @@ impl LeftCurly {
                 if !are_on_same_line(ctx.source(), start_token, brace) {
                     // Not on same line - check if it's on next line
                     let line_index = lintal_source_file::LineIndex::from_source_text(ctx.source());
-                    let source_code = lintal_source_file::SourceCode::new(ctx.source(), &line_index);
+                    let source_code =
+                        lintal_source_file::SourceCode::new(ctx.source(), &line_index);
                     let start_line = source_code.line_column(start_token.range().start()).line;
                     let brace_line = source_code.line_column(brace.range().start()).line;
 

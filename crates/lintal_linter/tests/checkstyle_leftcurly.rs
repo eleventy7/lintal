@@ -124,7 +124,7 @@ fn test_default_option() {
         Violation::line_previous(27, 5),
         Violation::line_previous(31, 5),
         // Violation at line 69 is a false positive - TODO: Fix
-        Violation::line_break_after(69, 25),  // False positive - should not appear
+        Violation::line_break_after(69, 25), // False positive - should not appear
     ];
 
     assert_eq!(

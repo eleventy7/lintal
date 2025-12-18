@@ -216,7 +216,8 @@ impl NeedBraces {
             "if" => {
                 // For if, check if condition and consequence are on same line
                 if let Some(consequence) = node.child_by_field_name("consequence") {
-                    let consequence_line = source_code.line_column(consequence.range().start()).line;
+                    let consequence_line =
+                        source_code.line_column(consequence.range().start()).line;
                     start_line == consequence_line
                 } else {
                     false

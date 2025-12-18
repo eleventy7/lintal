@@ -98,11 +98,11 @@ impl LintalConfig {
     /// Parse a lintal.toml file.
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, LintalConfigError> {
         let content = std::fs::read_to_string(path)?;
-        Self::from_str(&content)
+        Self::parse(&content)
     }
 
     /// Parse lintal.toml content.
-    pub fn from_str(content: &str) -> Result<Self, LintalConfigError> {
+    pub fn parse(content: &str) -> Result<Self, LintalConfigError> {
         Ok(toml::from_str(content)?)
     }
 
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_parse_empty_config() {
-        let config = LintalConfig::from_str("").unwrap();
+        let config = LintalConfig::parse("").unwrap();
         assert!(!config.fix.unsafe_fixes);
         assert!(config.fix.rules.is_empty());
         assert!(config.checkstyle.config.is_none());
@@ -155,7 +155,7 @@ MethodLength = "disabled"
 config = "config/checkstyle/checkstyle.xml"
 "#;
 
-        let config = LintalConfig::from_str(toml).unwrap();
+        let config = LintalConfig::parse(toml).unwrap();
 
         assert!(config.fix.unsafe_fixes);
         assert_eq!(config.rule_mode("WhitespaceAround"), RuleMode::Fix);
@@ -183,13 +183,10 @@ config = "config/checkstyle/checkstyle.xml"
 config = "checkstyle.xml"
 "#;
 
-        let config = LintalConfig::from_str(toml).unwrap();
+        let config = LintalConfig::parse(toml).unwrap();
         assert!(!config.fix.unsafe_fixes);
         assert!(config.fix.rules.is_empty());
-        assert_eq!(
-            config.checkstyle.config,
-            Some("checkstyle.xml".to_string())
-        );
+        assert_eq!(config.checkstyle.config, Some("checkstyle.xml".to_string()));
     }
 
     #[test]
@@ -202,7 +199,7 @@ Rule3 = "DISABLED"
 Rule4 = "off"
 "#;
 
-        let config = LintalConfig::from_str(toml).unwrap();
+        let config = LintalConfig::parse(toml).unwrap();
         assert_eq!(config.rule_mode("Rule1"), RuleMode::Fix);
         assert_eq!(config.rule_mode("Rule2"), RuleMode::Check);
         assert_eq!(config.rule_mode("Rule3"), RuleMode::Disabled);

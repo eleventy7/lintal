@@ -44,11 +44,7 @@ pub fn checkstyle_test_input(check_name: &str, file_name: &str) -> Option<PathBu
         .join(check_name.to_lowercase())
         .join(file_name);
 
-    if path.exists() {
-        Some(path)
-    } else {
-        None
-    }
+    if path.exists() { Some(path) } else { None }
 }
 
 fn ensure_repo(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -77,14 +73,17 @@ fn ensure_repo(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
             .status()?;
     } else {
         // Clone fresh
-        eprintln!(
-            "Cloning checkstyle repo for compatibility tests (one-time)..."
-        );
+        eprintln!("Cloning checkstyle repo for compatibility tests (one-time)...");
         std::fs::create_dir_all(target_dir)?;
 
         // Shallow clone with just the commit we need
         Command::new("git")
-            .args(["clone", "--filter=blob:none", "--no-checkout", CHECKSTYLE_REPO])
+            .args([
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                CHECKSTYLE_REPO,
+            ])
             .arg(target_dir)
             .status()?;
 

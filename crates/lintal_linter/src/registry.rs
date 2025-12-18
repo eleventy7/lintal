@@ -42,9 +42,8 @@ impl RuleRegistry {
 
     /// Register a rule type that implements FromConfig.
     pub fn register<R: FromConfig + 'static>(&mut self) {
-        self.factories.insert(R::MODULE_NAME, |props| {
-            Box::new(R::from_config(props))
-        });
+        self.factories
+            .insert(R::MODULE_NAME, |props| Box::new(R::from_config(props)));
     }
 
     /// Register all built-in rules.
@@ -57,7 +56,9 @@ impl RuleRegistry {
     /// Create a rule from a module name and properties.
     /// Returns None if the module name is not recognized.
     pub fn create_rule(&self, module_name: &str, properties: &Properties) -> Option<Box<dyn Rule>> {
-        self.factories.get(module_name).map(|factory| factory(properties))
+        self.factories
+            .get(module_name)
+            .map(|factory| factory(properties))
     }
 
     /// Check if a module name is registered.

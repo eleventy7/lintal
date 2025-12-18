@@ -156,7 +156,11 @@ mod tests {
 
         assert_eq!(root.kind(), "program");
         let named_count = root.named_children().count();
-        assert!(named_count > 0, "Expected named children, got {}", named_count);
+        assert!(
+            named_count > 0,
+            "Expected named children, got {}",
+            named_count
+        );
     }
 
     #[test]

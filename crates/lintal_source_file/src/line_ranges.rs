@@ -1,6 +1,6 @@
 use crate::find_newline;
-use memchr::{memchr2, memrchr2};
 use lintal_text_size::{TextLen, TextRange, TextSize};
+use memchr::{memchr2, memrchr2};
 use std::ops::Add;
 
 /// Extension trait for [`str`] that provides methods for working with ranges of lines.

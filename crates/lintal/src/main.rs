@@ -56,17 +56,13 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Check { paths, config } => {
-            run_check(&paths, config.as_deref())
-        }
+        Commands::Check { paths, config } => run_check(&paths, config.as_deref()),
         Commands::Fix {
             paths,
             config,
             diff,
             r#unsafe: allow_unsafe,
-        } => {
-            run_fix(&paths, config.as_deref(), diff, allow_unsafe)
-        }
+        } => run_fix(&paths, config.as_deref(), diff, allow_unsafe),
     }
 }
 
@@ -113,7 +109,12 @@ fn run_check(paths: &[PathBuf], config_path: Option<&Path>) -> Result<()> {
 }
 
 /// Run the fix command.
-fn run_fix(paths: &[PathBuf], config_path: Option<&Path>, diff_only: bool, allow_unsafe: bool) -> Result<()> {
+fn run_fix(
+    paths: &[PathBuf],
+    config_path: Option<&Path>,
+    diff_only: bool,
+    allow_unsafe: bool,
+) -> Result<()> {
     let (rules, merged_config) = load_rules(config_path)?;
 
     if rules.is_empty() {
@@ -229,7 +230,7 @@ fn fix_file(
     }
 
     // Sort edits by position (descending) to apply from end to start
-    edits.sort_by(|a, b| b.start().cmp(&a.start()));
+    edits.sort_by_key(|e| std::cmp::Reverse(e.start()));
 
     // Remove overlapping edits (keep first one, which is the one with highest start)
     let edits = remove_overlapping_edits(edits);
@@ -287,7 +288,7 @@ fn apply_edits(source: &str, edits: &[Edit]) -> String {
 }
 
 /// Print a unified diff between original and fixed source.
-fn print_diff(path: &PathBuf, original: &str, fixed: &str) {
+fn print_diff(path: &Path, original: &str, fixed: &str) {
     use std::fmt::Write;
 
     let mut output = String::new();
@@ -355,7 +356,11 @@ fn print_diff(path: &PathBuf, original: &str, fixed: &str) {
 
         // Flush hunk if we have context after changes
         if in_hunk && hunk_lines.len() > 6 {
-            let context_count = hunk_lines.iter().rev().take_while(|l| l.starts_with(' ')).count();
+            let context_count = hunk_lines
+                .iter()
+                .rev()
+                .take_while(|l| l.starts_with(' '))
+                .count();
             if context_count >= 3 {
                 // Flush the hunk
                 writeln!(
@@ -396,6 +401,7 @@ fn print_diff(path: &PathBuf, original: &str, fixed: &str) {
 }
 
 /// Load rules from configuration or use defaults.
+#[allow(clippy::type_complexity)]
 fn load_rules(config_path: Option<&Path>) -> Result<(Vec<Box<dyn Rule>>, Option<MergedConfig>)> {
     let registry = RuleRegistry::builtin();
 
@@ -407,9 +413,7 @@ fn load_rules(config_path: Option<&Path>) -> Result<(Vec<Box<dyn Rule>>, Option<
             // Create rules from configuration
             config
                 .enabled_rules()
-                .filter_map(|configured_rule| {
-                    create_rule_from_config(&registry, configured_rule)
-                })
+                .filter_map(|configured_rule| create_rule_from_config(&registry, configured_rule))
                 .collect()
         }
         None => {
@@ -433,8 +437,12 @@ fn load_config(config_path: Option<&Path>) -> Result<Option<MergedConfig>> {
     // Determine checkstyle.xml path
     let checkstyle_path = config_path
         .map(PathBuf::from)
-        .or_else(|| lintal.as_ref().and_then(|l| l.checkstyle.config.clone().map(PathBuf::from)))
-        .or_else(|| find_checkstyle_config());
+        .or_else(|| {
+            lintal
+                .as_ref()
+                .and_then(|l| l.checkstyle.config.clone().map(PathBuf::from))
+        })
+        .or_else(find_checkstyle_config);
 
     let Some(checkstyle_path) = checkstyle_path else {
         return Ok(None);
@@ -457,11 +465,11 @@ fn find_lintal_config() -> Option<LintalConfig> {
     let candidates = ["lintal.toml", ".lintal.toml", "config/lintal.toml"];
     for candidate in candidates {
         let path = Path::new(candidate);
-        if path.exists() {
-            if let Ok(config) = LintalConfig::from_file(path) {
-                eprintln!("Loaded lintal.toml from: {}", candidate);
-                return Some(config);
-            }
+        if path.exists()
+            && let Ok(config) = LintalConfig::from_file(path)
+        {
+            eprintln!("Loaded lintal.toml from: {}", candidate);
+            return Some(config);
         }
     }
     None

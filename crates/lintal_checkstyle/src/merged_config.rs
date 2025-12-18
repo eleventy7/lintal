@@ -98,7 +98,9 @@ impl MergedConfig {
             .iter()
             .map(|module| ConfiguredRule {
                 name: module.name.clone(),
-                properties: module.properties_map().iter()
+                properties: module
+                    .properties_map()
+                    .iter()
                     .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect(),
                 mode: lintal.rule_mode(&module.name),
@@ -169,13 +171,12 @@ impl ConfigLoader {
     /// Try to find checkstyle.xml from lintal.toml or common locations.
     pub fn find_checkstyle(mut self, lintal: Option<&LintalConfig>) -> Self {
         // First check if lintal.toml specifies the path
-        if let Some(lintal) = lintal {
-            if let Some(path) = &lintal.checkstyle.config {
-                if Path::new(path).exists() {
-                    self.checkstyle_path = Some(std::path::PathBuf::from(path));
-                    return self;
-                }
-            }
+        if let Some(lintal) = lintal
+            && let Some(path) = &lintal.checkstyle.config
+            && Path::new(path).exists()
+        {
+            self.checkstyle_path = Some(std::path::PathBuf::from(path));
+            return self;
         }
 
         // Try common locations
@@ -204,20 +205,22 @@ impl ConfigLoader {
 
         // Try to find checkstyle.xml from lintal config
         let checkstyle_path = self.checkstyle_path.or_else(|| {
-            lintal.as_ref().and_then(|l| {
-                l.checkstyle.config.as_ref().map(std::path::PathBuf::from)
-            })
+            lintal
+                .as_ref()
+                .and_then(|l| l.checkstyle.config.as_ref().map(std::path::PathBuf::from))
         });
 
         // Load checkstyle.xml
         let checkstyle = match checkstyle_path {
             Some(path) if path.exists() => CheckstyleConfig::from_file(&path)?,
-            Some(path) => return Err(ConfigError::Checkstyle(
-                CheckstyleError::Io(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("Checkstyle config not found: {}", path.display())
-                ))
-            )),
+            Some(path) => {
+                return Err(ConfigError::Checkstyle(CheckstyleError::Io(
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("Checkstyle config not found: {}", path.display()),
+                    ),
+                )));
+            }
             None => return Err(ConfigError::NoConfig),
         };
 
@@ -248,7 +251,7 @@ mod tests {
         <module name="NeedBraces"/>
     </module>
 </module>"#;
-        CheckstyleConfig::from_str(xml).unwrap()
+        CheckstyleConfig::parse(xml).unwrap()
     }
 
     #[test]
@@ -273,7 +276,8 @@ mod tests {
     #[test]
     fn test_merged_config_with_lintal() {
         let checkstyle = sample_checkstyle();
-        let lintal = LintalConfig::from_str(r#"
+        let lintal = LintalConfig::parse(
+            r#"
 [fix]
 unsafe_fixes = true
 
@@ -281,7 +285,9 @@ unsafe_fixes = true
 WhitespaceAround = "fix"
 LeftCurly = "check"
 NeedBraces = "disabled"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let merged = MergedConfig::new(&checkstyle, Some(&lintal));
 

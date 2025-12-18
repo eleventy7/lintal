@@ -52,6 +52,7 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     /// Create a new diagnostic from a violation.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new<V: Violation>(violation: V, range: TextRange) -> Self {
         Self {
             kind: DiagnosticKind {

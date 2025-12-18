@@ -81,11 +81,11 @@ impl CheckstyleConfig {
     /// Parse a checkstyle.xml file.
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, CheckstyleError> {
         let content = std::fs::read_to_string(path)?;
-        Self::from_str(&content)
+        Self::parse(&content)
     }
 
     /// Parse checkstyle XML content.
-    pub fn from_str(content: &str) -> Result<Self, CheckstyleError> {
+    pub fn parse(content: &str) -> Result<Self, CheckstyleError> {
         Ok(from_str(content)?)
     }
 
@@ -130,7 +130,7 @@ mod tests {
     </module>
 </module>"#;
 
-        let config = CheckstyleConfig::from_str(xml).unwrap();
+        let config = CheckstyleConfig::parse(xml).unwrap();
         assert_eq!(config.name, "Checker");
 
         let rules = config.rules();
@@ -156,7 +156,7 @@ mod tests {
     </module>
 </module>"#;
 
-        let config = CheckstyleConfig::from_str(xml).unwrap();
+        let config = CheckstyleConfig::parse(xml).unwrap();
         let file_modules = config.file_modules();
         assert_eq!(file_modules.len(), 2);
         assert_eq!(file_modules[0].name, "FileTabCharacter");

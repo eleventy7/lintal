@@ -153,7 +153,7 @@ fn extract_token(message: &str) -> String {
 /// Load a checkstyle test input file.
 /// Returns None if the checkstyle repo is not available.
 fn load_checkstyle_fixture(check_name: &str, file_name: &str) -> Option<String> {
-    let path = checkstyle_repo::checkstyle_test_input(check_name, file_name)?;
+    let path = checkstyle_repo::whitespace_test_input(check_name, file_name)?;
     std::fs::read_to_string(&path).ok()
 }
 

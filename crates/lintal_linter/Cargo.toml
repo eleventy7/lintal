@@ -15,5 +15,6 @@ lintal_checkstyle = { path = "../lintal_checkstyle" }
 lintal_diagnostics = { path = "../lintal_diagnostics" }
 lintal_text_size = { path = "../lintal_text_size" }
 lintal_source_file = { path = "../lintal_source_file" }
+regex = "1.12.2"
 
 [dev-dependencies]

@@ -48,9 +48,28 @@ impl RuleRegistry {
 
     /// Register all built-in rules.
     fn register_builtins(&mut self) {
-        use crate::rules::WhitespaceAround;
+        use crate::rules::{
+            AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
+            FileTabCharacter, LeftCurly, MethodParamPad, NeedBraces, NoWhitespaceAfter,
+            NoWhitespaceBefore, ParenPad, RightCurly, SingleSpaceSeparator, TypecastParenPad,
+            WhitespaceAfter, WhitespaceAround,
+        };
         self.register::<WhitespaceAround>();
-        // Additional rules will be registered here as they're implemented
+        self.register::<WhitespaceAfter>();
+        self.register::<NoWhitespaceAfter>();
+        self.register::<NoWhitespaceBefore>();
+        self.register::<ParenPad>();
+        self.register::<SingleSpaceSeparator>();
+        self.register::<MethodParamPad>();
+        self.register::<EmptyForInitializerPad>();
+        self.register::<TypecastParenPad>();
+        self.register::<FileTabCharacter>();
+        self.register::<LeftCurly>();
+        self.register::<RightCurly>();
+        self.register::<NeedBraces>();
+        self.register::<EmptyBlock>();
+        self.register::<EmptyCatchBlock>();
+        self.register::<AvoidNestedBlocks>();
     }
 
     /// Create a rule from a module name and properties.

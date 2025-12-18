@@ -7,6 +7,7 @@ pub mod no_whitespace_after;
 pub mod no_whitespace_before;
 pub mod paren_pad;
 pub mod single_space_separator;
+pub mod typecast_paren_pad;
 pub mod whitespace_after;
 mod whitespace_around;
 
@@ -16,5 +17,6 @@ pub use no_whitespace_after::NoWhitespaceAfter;
 pub use no_whitespace_before::NoWhitespaceBefore;
 pub use paren_pad::ParenPad;
 pub use single_space_separator::SingleSpaceSeparator;
+pub use typecast_paren_pad::TypecastParenPad;
 pub use whitespace_after::WhitespaceAfter;
 pub use whitespace_around::WhitespaceAround;

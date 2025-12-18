@@ -50,7 +50,7 @@ impl RuleRegistry {
     fn register_builtins(&mut self) {
         use crate::rules::{
             EmptyForInitializerPad, MethodParamPad, NoWhitespaceAfter, NoWhitespaceBefore,
-            ParenPad, SingleSpaceSeparator, WhitespaceAfter, WhitespaceAround,
+            ParenPad, SingleSpaceSeparator, TypecastParenPad, WhitespaceAfter, WhitespaceAround,
         };
         self.register::<WhitespaceAround>();
         self.register::<WhitespaceAfter>();
@@ -60,6 +60,7 @@ impl RuleRegistry {
         self.register::<SingleSpaceSeparator>();
         self.register::<MethodParamPad>();
         self.register::<EmptyForInitializerPad>();
+        self.register::<TypecastParenPad>();
         // Additional rules will be registered here as they're implemented
     }
 

@@ -1,0 +1,19 @@
+[package]
+name = "jruff_linter"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+
+[lib]
+doctest = false
+
+[dependencies]
+jruff_java_parser = { path = "../jruff_java_parser" }
+jruff_java_cst = { path = "../jruff_java_cst" }
+jruff_checkstyle = { path = "../jruff_checkstyle" }
+jruff_diagnostics = { path = "../jruff_diagnostics" }
+jruff_text_size = { path = "../jruff_text_size" }
+jruff_source_file = { path = "../jruff_source_file" }
+
+[dev-dependencies]

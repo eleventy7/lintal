@@ -1,0 +1,15 @@
+[package]
+name = "jruff_java_parser"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+
+[lib]
+doctest = false
+
+[dependencies]
+tree-sitter = "0.24"
+tree-sitter-java = "0.23"
+
+[dev-dependencies]

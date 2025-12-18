@@ -1,0 +1,20 @@
+jruff - A fast Java linter with auto-fix support
+
+This project is a fork of Ruff (https://github.com/astral-sh/ruff),
+an extremely fast Python linter and code formatter, written in Rust.
+
+The following components are derived from Ruff:
+- crates/jruff_text_size - Text size and range utilities
+- crates/jruff_source_file - Source file handling and line indexing
+- crates/jruff_diagnostics - Diagnostic and fix infrastructure
+
+Original Ruff authors and contributors:
+- Charlie Marsh <charlie.r.marsh@gmail.com>
+- Astral Software Inc.
+- And all Ruff contributors (https://github.com/astral-sh/ruff/graphs/contributors)
+
+Ruff is licensed under the MIT License:
+https://github.com/astral-sh/ruff/blob/main/LICENSE
+
+We are grateful to the Ruff team for creating such excellent infrastructure
+that made this project possible.

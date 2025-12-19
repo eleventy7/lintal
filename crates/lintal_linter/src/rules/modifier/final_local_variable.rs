@@ -194,6 +194,9 @@ impl<'a> FinalLocalVariableVisitor<'a> {
             "if_statement" => {
                 self.process_if_statement(node);
             }
+            "switch_expression" | "switch_statement" => {
+                self.process_switch(node);
+            }
             _ => {
                 self.visit_children(node);
             }
@@ -205,6 +208,53 @@ impl<'a> FinalLocalVariableVisitor<'a> {
         for child in node.children() {
             self.visit(&child);
         }
+    }
+
+    /// Check if a node or its descendants contain an assignment to a specific variable.
+    fn contains_assignment_to(&self, node: &CstNode, var_name: &str) -> bool {
+        match node.kind() {
+            "assignment_expression" => {
+                if let Some(left) = node.child_by_field_name("left")
+                    && left.kind() == "identifier"
+                {
+                    let name = &self.ctx.source()[left.range()];
+                    if name == var_name {
+                        return true;
+                    }
+                }
+            }
+            "update_expression" => {
+                // Check for x++, ++x, x--, --x
+                if let Some(expr) = node.child_by_field_name("argument") {
+                    if expr.kind() == "identifier" {
+                        let name = &self.ctx.source()[expr.range()];
+                        if name == var_name {
+                            return true;
+                        }
+                    }
+                } else {
+                    // Fallback: check all children
+                    for child in node.children() {
+                        if child.kind() == "identifier" {
+                            let name = &self.ctx.source()[child.range()];
+                            if name == var_name {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Recursively check children
+        for child in node.children() {
+            if self.contains_assignment_to(&child, var_name) {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Process a variable declaration.
@@ -417,6 +467,127 @@ impl<'a> FinalLocalVariableVisitor<'a> {
                         && var.has_initializer
                         && consequence_assignments.contains(var_name)
                     {
+                        var.already_assigned = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Process a switch statement or switch expression with control flow analysis.
+    fn process_switch(&mut self, node: &CstNode) {
+        // Check if we have a scope
+        if self.scopes.is_empty() {
+            // No scope, just visit children normally
+            self.visit_children(node);
+            return;
+        }
+
+        // Track which variables were uninitialized before the switch
+        let uninitialized_before: HashSet<String> = {
+            let current_scope = self.scopes.last().unwrap();
+            current_scope
+                .variables
+                .iter()
+                .filter(|(_, v)| !v.has_initializer && !v.assigned && !v.already_assigned)
+                .map(|(name, _)| name.clone())
+                .collect()
+        };
+
+
+        // Process the condition/value
+        if let Some(condition) = node.child_by_field_name("condition")
+            .or_else(|| node.child_by_field_name("value"))
+        {
+            self.visit(&condition);
+        }
+
+        // Get the switch body
+        let switch_body = node.child_by_field_name("body");
+        if switch_body.is_none() {
+            self.visit_children(node);
+            return;
+        }
+        let switch_body = switch_body.unwrap();
+
+        // Collect all branches (switch_block_statement_group for traditional switches,
+        // switch_rule for arrow-style cases, and switch_label for expressions)
+        let mut branches: Vec<CstNode> = Vec::new();
+
+        for child in switch_body.children() {
+            match child.kind() {
+                "switch_block_statement_group" => {
+                    // Traditional switch case with statements
+                    branches.push(child);
+                }
+                "switch_rule" => {
+                    // Arrow-style case (Java 14+)
+                    branches.push(child);
+                }
+                _ => {}
+            }
+        }
+
+        // First, visit all branches to track assignments globally
+        for branch in &branches {
+            self.visit(branch);
+        }
+
+        // Now analyze which variables were assigned in which branches
+        // We do this by checking the AST of each branch, not the visitor state
+        let mut branch_assignments: Vec<HashSet<String>> = Vec::new();
+
+        if let Some(scope) = self.scopes.last() {
+            for branch in &branches {
+                let mut assignments = HashSet::new();
+                // Check each variable to see if it's assigned in this branch
+                for var_name in scope.variables.keys() {
+                    if self.contains_assignment_to(branch, var_name) {
+                        assignments.insert(var_name.clone());
+                    }
+                }
+                branch_assignments.push(assignments);
+            }
+        }
+
+        // Merge the results based on control flow rules
+        // Key insight: A variable should be final if it's assigned at most once in each execution path.
+        // For switches, each branch is a different execution path, so:
+        // - If a variable is assigned in any branch(es) and nowhere else, it's a final candidate
+        // - If a variable was initialized before the switch and is assigned in any branch, it's NOT a candidate (assigned twice)
+        // - If a variable is assigned in multiple branches, that's OK (different execution paths)
+
+        if let Some(scope) = self.scopes.last_mut() {
+            // Find all variables assigned in at least one branch
+            let mut assigned_in_switch: HashSet<String> = HashSet::new();
+            for assignments in &branch_assignments {
+                assigned_in_switch.extend(assignments.iter().cloned());
+            }
+
+            // For uninitialized variables (no initializer, not assigned before)
+            for var_name in &uninitialized_before {
+                if assigned_in_switch.contains(var_name) {
+                    // Variable is assigned somewhere in the switch
+                    // This counts as the first (and possibly only) assignment
+                    // Reset the already_assigned flag if it was set during visitor traversal
+                    if let Some(var) = scope.variables.get_mut(var_name)
+                        && var.already_assigned
+                    {
+                        // The variable was marked as already_assigned because the visitor
+                        // saw multiple assignments (one per branch), but these are in different
+                        // execution paths, so it's actually just one assignment per path
+                        var.already_assigned = false;
+                        var.assigned = true;
+                    }
+                }
+            }
+
+            // For variables that were already initialized before the switch
+            for (var_name, var) in scope.variables.iter_mut() {
+                if !uninitialized_before.contains(var_name) && var.has_initializer {
+                    // Variable was initialized before
+                    if assigned_in_switch.contains(var_name) {
+                        // Assigned in switch after being initialized - this is a second assignment
                         var.already_assigned = true;
                     }
                 }

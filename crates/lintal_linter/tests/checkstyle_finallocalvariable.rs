@@ -375,3 +375,246 @@ public class Test {
 
     verify_violations(&violations, &expected);
 }
+
+// =============================================================================
+// Test: testFinalLocalVariableSwitchAssignment
+// File: InputFinalLocalVariableCheckSwitchAssignment.java
+// Config: validateEnhancedForLoopVariable = (default)false
+// Expected violations from checkstyle test:
+//   21:13 - Variable 'a' should be declared final
+//   44:13 - Variable 'b' should be declared final
+//   46:21 - Variable 'x' should be declared final
+//   72:16 - Variable 'res' should be declared final
+//   92:16 - Variable 'res' should be declared final
+// =============================================================================
+
+#[test]
+fn test_final_local_variable_switch_assignment() {
+    let Some(source) =
+        load_finallocalvariable_fixture("InputFinalLocalVariableCheckSwitchAssignment.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(&source, properties);
+
+    let expected = vec![
+        Violation::new(21, 13), // a
+        Violation::new(44, 13), // b
+        Violation::new(46, 21), // x
+        Violation::new(72, 16), // res
+        Violation::new(92, 16), // res
+    ];
+
+    verify_violations(&violations, &expected);
+}
+
+// =============================================================================
+// Test: testVariableIsAssignedInsideAndOutsideSwitch
+// File: InputFinalLocalVariableAssignedInsideAndOutsideSwitch.java
+// Config: validateEnhancedForLoopVariable = (default)false
+// Expected violations from checkstyle test:
+//   39:13 - Variable 'b' should be declared final
+// =============================================================================
+
+#[test]
+fn test_variable_is_assigned_inside_and_outside_switch() {
+    let Some(source) =
+        load_finallocalvariable_fixture("InputFinalLocalVariableAssignedInsideAndOutsideSwitch.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(&source, properties);
+
+    let expected = vec![
+        Violation::new(39, 13), // b
+    ];
+
+    verify_violations(&violations, &expected);
+}
+
+// =============================================================================
+// Test: testFinalLocalVariableSwitchStatement
+// File: InputFinalLocalVariableSwitchStatement.java
+// Config: validateEnhancedForLoopVariable = (default)false
+// Expected violations from checkstyle test: (none)
+// =============================================================================
+
+#[test]
+fn test_final_local_variable_switch_statement() {
+    let Some(source) =
+        load_finallocalvariable_fixture("InputFinalLocalVariableSwitchStatement.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(&source, properties);
+
+    // No violations expected - variable x is assigned in all cases but falls through
+    let expected = vec![];
+
+    verify_violations(&violations, &expected);
+}
+
+// Test switch with all branches assigning
+#[test]
+fn test_switch_all_branches_assign() {
+    let source = r#"
+public class Test {
+    void test(int x) {
+        // Should report: assigned in all branches (including default)
+        int a;
+        switch (x) {
+            case 1:
+                a = 10;
+                break;
+            case 2:
+                a = 20;
+                break;
+            default:
+                a = 30;
+                break;
+        }
+    }
+}
+"#;
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(source, properties);
+
+    // Should report 'a' at line 5
+    let expected = vec![Violation::new(5, 13)];
+
+    verify_violations(&violations, &expected);
+}
+
+// Test switch with some branches assigning
+#[test]
+fn test_switch_some_branches_assign() {
+    let source = r#"
+public class Test {
+    void test(int x) {
+        // SHOULD report: assigned in some branches, never reassigned
+        int a;
+        switch (x) {
+            case 1:
+                a = 10;
+                break;
+            case 2:
+                // no assignment
+                break;
+            default:
+                a = 30;
+                break;
+        }
+    }
+}
+"#;
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(source, properties);
+
+    // Should report 'a' - assigned in switch (even though not all branches)
+    // because it's never reassigned after the first assignment in each path
+    let expected = vec![Violation::new(5, 13)];
+
+    verify_violations(&violations, &expected);
+}
+
+// Test switch with assignment after branches
+#[test]
+fn test_switch_reassignment_after_branches() {
+    let source = r#"
+public class Test {
+    void test(int x) {
+        // Should NOT report: assigned in branches then reassigned
+        int a;
+        switch (x) {
+            case 1:
+                a = 10;
+                break;
+            case 2:
+                a = 20;
+                break;
+            default:
+                a = 30;
+                break;
+        }
+        a = 40;
+    }
+}
+"#;
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(source, properties);
+
+    // Should not report 'a' - reassigned after switch
+    let expected = vec![];
+
+    verify_violations(&violations, &expected);
+}
+
+// Test switch expression (arrow syntax)
+#[test]
+fn test_switch_expression_arrow() {
+    let source = r#"
+public class Test {
+    void test(int x) {
+        // Should report: result of switch expression never reassigned
+        int a = switch (x) {
+            case 1 -> 10;
+            case 2 -> 20;
+            default -> 30;
+        };
+
+        // Should NOT report: reassigned
+        int b = switch (x) {
+            case 1 -> 100;
+            default -> 200;
+        };
+        b = 50;
+    }
+}
+"#;
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(source, properties);
+
+    // Should report 'a' at line 5
+    let expected = vec![Violation::new(5, 13)];
+
+    verify_violations(&violations, &expected);
+}
+
+// Test switch rule with assignment
+#[test]
+fn test_switch_rule_assignment() {
+    let source = r#"
+public class Test {
+    void test(int x) {
+        // Should report: assigned in all arrow cases
+        String res;
+        switch (x) {
+            case 1 -> res = "A";
+            case 2 -> res = "B";
+            default -> res = "C";
+        }
+    }
+}
+"#;
+
+    let properties = HashMap::new();
+    let violations = check_final_local_variable(source, properties);
+
+    // Should report 'res' at line 5
+    let expected = vec![Violation::new(5, 16)];
+
+    verify_violations(&violations, &expected);
+}

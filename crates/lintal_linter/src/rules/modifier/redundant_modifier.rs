@@ -85,6 +85,10 @@ impl Rule for RedundantModifier {
             "constructor_declaration" => self.check_constructor_modifiers(ctx, node),
             "try_with_resources_statement" => self.check_try_with_resources(ctx, node),
             "formal_parameter" => self.check_parameter_modifiers(ctx, node),
+            "local_variable_declaration" => self.check_local_variable_modifiers(ctx, node),
+            "instanceof_expression" => self.check_instanceof_modifiers(ctx, node),
+            "catch_formal_parameter" => self.check_catch_parameter_modifiers(ctx, node),
+            "switch_rule" => self.check_switch_rule_modifiers(ctx, node),
             _ => vec![],
         });
 
@@ -518,8 +522,17 @@ impl RedundantModifier {
     }
 
     /// Check for redundant final modifier on parameters of abstract/interface/native methods.
+    /// Also checks for unnamed lambda parameters in JDK 22+.
     fn check_parameter_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
+
+        // Task 10: Check for unnamed lambda parameters in JDK 22+
+        if self.jdk_version >= 22 && self.is_in_lambda(node) && self.is_unnamed_variable(node)
+            && let Some(modifiers) = node.children().find(|c| c.kind() == "modifiers")
+            && let Some(final_mod) = self.find_modifier(&modifiers, "final")
+        {
+            diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+        }
 
         // Check if this parameter belongs to a method that cannot have a body
         // (abstract, interface, or native)
@@ -650,6 +663,167 @@ impl RedundantModifier {
         }
 
         diagnostics
+    }
+
+    /// Check for redundant final modifier on local variable declarations.
+    /// In JDK 22+, final on unnamed variables (_) is redundant.
+    fn check_local_variable_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Only check in JDK 22+
+        if self.jdk_version < 22 {
+            return diagnostics;
+        }
+
+        // Check if variable is named "_"
+        if !self.is_unnamed_variable(node) {
+            return diagnostics;
+        }
+
+        // Check for final modifier
+        if let Some(modifiers) = node.children().find(|c| c.kind() == "modifiers")
+            && let Some(final_mod) = self.find_modifier(&modifiers, "final")
+        {
+            diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+        }
+
+        diagnostics
+    }
+
+    /// Check for redundant final modifier on instanceof expressions with pattern variables.
+    /// In JDK 22+, final on unnamed pattern variables (_) is redundant.
+    fn check_instanceof_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Only check in JDK 22+
+        if self.jdk_version < 22 {
+            return diagnostics;
+        }
+
+        // Check if the instanceof has a final modifier
+        let has_final = node.children().any(|c| c.kind() == "final");
+        if !has_final {
+            return diagnostics;
+        }
+
+        // Check if the pattern variable is named "_"
+        let has_underscore = node.children().any(|c| {
+            c.kind() == "identifier" && c.text().trim() == "_"
+        });
+
+        if has_underscore {
+            // Find the final modifier node
+            if let Some(final_mod) = node.children().find(|c| c.kind() == "final") {
+                diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+            }
+        }
+
+        diagnostics
+    }
+
+    /// Check for redundant final modifier on catch parameters.
+    /// In JDK 22+, final on unnamed catch parameters (_) is redundant.
+    fn check_catch_parameter_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Only check in JDK 22+
+        if self.jdk_version < 22 {
+            return diagnostics;
+        }
+
+        // Check if parameter is named "_"
+        if !self.is_unnamed_variable(node) {
+            return diagnostics;
+        }
+
+        // Check for final modifier
+        if let Some(modifiers) = node.children().find(|c| c.kind() == "modifiers")
+            && let Some(final_mod) = self.find_modifier(&modifiers, "final")
+        {
+            diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+        }
+
+        diagnostics
+    }
+
+    /// Check for redundant final modifier on switch rule patterns.
+    /// In JDK 22+, final on unnamed pattern variables (_) in switch cases is redundant.
+    fn check_switch_rule_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Only check in JDK 22+
+        if self.jdk_version < 22 {
+            return diagnostics;
+        }
+
+        // Check if there's an ERROR or identifier node with text "_" (tree-sitter limitation)
+        let has_underscore = node.children().any(|c| {
+            (c.kind() == "ERROR" || c.kind() == "identifier") && c.text().trim() == "_"
+        });
+
+        if !has_underscore {
+            return diagnostics;
+        }
+
+        // Look for final modifier in the switch_label child
+        if let Some(switch_label) = node.children().find(|c| c.kind() == "switch_label") {
+            // Check if the label contains a pattern with final
+            if let Some(pattern) = switch_label.children().find(|c| c.kind() == "pattern") {
+                // Check for final modifier in the pattern
+                if let Some(final_mod) = pattern.children().find(|c| c.kind() == "final") {
+                    diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+                }
+            }
+        }
+
+        diagnostics
+    }
+
+    /// Check if a variable/parameter node is an unnamed variable (_).
+    fn is_unnamed_variable(&self, node: &CstNode) -> bool {
+        // Look for underscore_pattern or identifier with text "_"
+        for child in node.children() {
+            if child.kind() == "underscore_pattern" {
+                return true;
+            }
+            if child.kind() == "identifier" {
+                let text = child.text().trim();
+                if text == "_" {
+                    return true;
+                }
+            }
+            // For variable_declarator, check its first child
+            if child.kind() == "variable_declarator" {
+                for grandchild in child.children() {
+                    if grandchild.kind() == "underscore_pattern" {
+                        return true;
+                    }
+                    if grandchild.kind() == "identifier" && grandchild.text().trim() == "_" {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a node is inside a lambda expression.
+    fn is_in_lambda(&self, node: &CstNode) -> bool {
+        let mut current = node.parent();
+        while let Some(parent) = current {
+            if parent.kind() == "lambda_expression" {
+                return true;
+            }
+            // Stop at method/class boundaries
+            if matches!(
+                parent.kind(),
+                "method_declaration" | "constructor_declaration" | "class_declaration"
+            ) {
+                return false;
+            }
+            current = parent.parent();
+        }
+        false
     }
 }
 
@@ -828,5 +1002,80 @@ mod tests {
         let diagnostics = check_source(source, Some(16));
         // strictfp is NOT redundant before JDK 17
         assert_eq!(diagnostics.len(), 0);
+    }
+
+    #[test]
+    fn test_unnamed_local_variable_jdk22() {
+        let source = r#"
+class Test {
+    void m() {
+        final int _ = 5;
+    }
+}
+"#;
+        let diagnostics = check_source(source, Some(22));
+        assert_eq!(diagnostics.len(), 1, "Expected 1 violation for unnamed local variable");
+        assert!(diagnostics[0]
+            .kind
+            .body
+            .contains("Redundant 'final' modifier"));
+    }
+
+    #[test]
+    fn test_unnamed_pattern_variable_jdk22() {
+        let source = r#"
+class Test {
+    void m(Object o) {
+        if (o instanceof final String _) { }
+    }
+}
+"#;
+        let diagnostics = check_source(source, Some(22));
+        assert_eq!(diagnostics.len(), 1, "Expected 1 violation for unnamed pattern variable");
+        assert!(diagnostics[0]
+            .kind
+            .body
+            .contains("Redundant 'final' modifier"));
+    }
+
+    #[test]
+    fn test_unnamed_catch_parameter_jdk22() {
+        let source = r#"
+class Test {
+    void m() {
+        try {
+        } catch (final Exception _) {
+        }
+    }
+}
+"#;
+        let diagnostics = check_source(source, Some(22));
+        assert_eq!(diagnostics.len(), 1, "Expected 1 violation for unnamed catch parameter");
+        assert!(diagnostics[0]
+            .kind
+            .body
+            .contains("Redundant 'final' modifier"));
+    }
+
+    #[test]
+    fn test_unnamed_lambda_parameter_jdk22() {
+        let source = r#"
+import java.util.function.BiFunction;
+class Test {
+    void m() {
+        BiFunction<Integer, Integer, Integer> f = (final Integer _, final Integer _) -> {
+            return 5;
+        };
+    }
+}
+"#;
+        let diagnostics = check_source(source, Some(22));
+        assert_eq!(diagnostics.len(), 2, "Expected 2 violations for unnamed lambda parameters");
+        for diagnostic in diagnostics {
+            assert!(diagnostic
+                .kind
+                .body
+                .contains("Redundant 'final' modifier"));
+        }
     }
 }

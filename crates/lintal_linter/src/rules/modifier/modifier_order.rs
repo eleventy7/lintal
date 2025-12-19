@@ -75,7 +75,11 @@ impl Rule for ModifierOrder {
         let mut diagnostics = vec![];
 
         // Collect all modifiers (both annotations and regular modifiers)
-        let mods: Vec<CstNode> = node.children().collect();
+        // Exclude comments which may appear between modifiers in some codebases
+        let mods: Vec<CstNode> = node
+            .children()
+            .filter(|child| !matches!(child.kind(), "line_comment" | "block_comment"))
+            .collect();
 
         if mods.is_empty() {
             return diagnostics;

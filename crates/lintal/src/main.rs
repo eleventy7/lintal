@@ -11,8 +11,25 @@ use lintal_linter::{
     CheckContext, PlainTextCommentFilterConfig, Rule, RuleRegistry, SuppressionContext,
 };
 use lintal_text_size::Ranged;
+use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use walkdir::WalkDir;
+
+/// Result of checking a single file.
+struct FileCheckResult {
+    violations: Vec<String>,
+    violation_count: usize,
+    fixable_count: usize,
+}
+
+/// Result of fixing a single file.
+struct FileFixResult {
+    fixed: usize,
+    unfixable: usize,
+    changed: bool,
+    messages: Vec<String>,
+}
 
 #[derive(Parser)]
 #[command(name = "lintal")]
@@ -87,14 +104,33 @@ fn run_check(paths: &[PathBuf], config_path: Option<&Path>) -> Result<()> {
         );
     }
 
+    let files = collect_java_files(paths);
+    let file_count = files.len();
+    let files_processed = AtomicUsize::new(0);
+
+    // Process files in parallel
+    let results: Vec<FileCheckResult> = files
+        .par_iter()
+        .filter_map(|path| {
+            let result = check_file(path, &rules, &suppression_filters);
+            files_processed.fetch_add(1, Ordering::Relaxed);
+            result.ok()
+        })
+        .collect();
+
+    // Aggregate and output results
     let mut total_violations = 0;
     let mut total_fixable = 0;
 
-    for path in collect_java_files(paths) {
-        let (violations, fixable) = check_file(&path, &rules, &suppression_filters)?;
-        total_violations += violations;
-        total_fixable += fixable;
+    for result in results {
+        for violation in &result.violations {
+            println!("{violation}");
+        }
+        total_violations += result.violation_count;
+        total_fixable += result.fixable_count;
     }
+
+    eprintln!("Checked {} files", file_count);
 
     if total_violations > 0 {
         println!(
@@ -140,21 +176,28 @@ fn run_fix(
         Applicability::Safe
     };
 
+    let files = collect_java_files(paths);
+
+    // Process files in parallel
+    let results: Vec<FileFixResult> = files
+        .par_iter()
+        .filter_map(|path| {
+            fix_file(path, &rules, &suppression_filters, applicability, diff_only).ok()
+        })
+        .collect();
+
+    // Aggregate and output results
     let mut total_fixed = 0;
     let mut total_unfixable = 0;
     let mut files_changed = 0;
 
-    for path in collect_java_files(paths) {
-        let (fixed, unfixable, changed) = fix_file(
-            &path,
-            &rules,
-            &suppression_filters,
-            applicability,
-            diff_only,
-        )?;
-        total_fixed += fixed;
-        total_unfixable += unfixable;
-        if changed {
+    for result in results {
+        for msg in &result.messages {
+            print!("{msg}");
+        }
+        total_fixed += result.fixed;
+        total_unfixable += result.unfixable;
+        if result.changed {
             files_changed += 1;
         }
     }
@@ -192,14 +235,18 @@ fn fix_file(
     suppression_filters: &[PlainTextCommentFilterConfig],
     applicability: Applicability,
     diff_only: bool,
-) -> Result<(usize, usize, bool)> {
+) -> Result<FileFixResult> {
     let source = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
     let mut parser = JavaParser::new();
     let Some(result) = parser.parse(&source) else {
-        eprintln!("{}: Failed to parse", path.display());
-        return Ok((0, 0, false));
+        return Ok(FileFixResult {
+            fixed: 0,
+            unfixable: 0,
+            changed: false,
+            messages: vec![format!("{}: Failed to parse\n", path.display())],
+        });
     };
 
     let ctx = CheckContext::new(&source);
@@ -222,7 +269,12 @@ fn fix_file(
     }
 
     if diagnostics.is_empty() {
-        return Ok((0, 0, false));
+        return Ok(FileFixResult {
+            fixed: 0,
+            unfixable: 0,
+            changed: false,
+            messages: vec![],
+        });
     }
 
     // Collect applicable fixes
@@ -244,7 +296,12 @@ fn fix_file(
     }
 
     if edits.is_empty() {
-        return Ok((0, unfixable, false));
+        return Ok(FileFixResult {
+            fixed: 0,
+            unfixable,
+            changed: false,
+            messages: vec![],
+        });
     }
 
     // Sort edits by position (descending) to apply from end to start
@@ -256,17 +313,24 @@ fn fix_file(
     // Apply edits to source
     let fixed_source = apply_edits(&source, &edits);
 
+    let mut messages = Vec::new();
+
     if diff_only {
-        // Show diff
-        print_diff(path, &source, &fixed_source);
+        // Buffer diff output
+        messages.push(format_diff(path, &source, &fixed_source));
     } else {
         // Write fixed source
         std::fs::write(path, &fixed_source)
             .with_context(|| format!("Failed to write {}", path.display()))?;
-        eprintln!("{}: {} fix(es) applied", path.display(), fixed);
+        messages.push(format!("{}: {} fix(es) applied\n", path.display(), fixed));
     }
 
-    Ok((fixed, unfixable, true))
+    Ok(FileFixResult {
+        fixed,
+        unfixable,
+        changed: true,
+        messages,
+    })
 }
 
 /// Remove overlapping edits, keeping the first one (highest start position).
@@ -306,7 +370,7 @@ fn apply_edits(source: &str, edits: &[Edit]) -> String {
 }
 
 /// Print a unified diff between original and fixed source.
-fn print_diff(path: &Path, original: &str, fixed: &str) {
+fn format_diff(path: &Path, original: &str, fixed: &str) -> String {
     use std::fmt::Write;
 
     let mut output = String::new();
@@ -415,7 +479,7 @@ fn print_diff(path: &Path, original: &str, fixed: &str) {
         }
     }
 
-    print!("{}", output);
+    output
 }
 
 /// Load rules from configuration or use defaults.
@@ -595,14 +659,17 @@ fn check_file(
     path: &PathBuf,
     rules: &[Box<dyn Rule>],
     suppression_filters: &[PlainTextCommentFilterConfig],
-) -> Result<(usize, usize)> {
+) -> Result<FileCheckResult> {
     let source = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
     let mut parser = JavaParser::new();
     let Some(result) = parser.parse(&source) else {
-        eprintln!("{}: Failed to parse", path.display());
-        return Ok((0, 0));
+        return Ok(FileCheckResult {
+            violations: vec![format!("{}: Failed to parse", path.display())],
+            violation_count: 0,
+            fixable_count: 0,
+        });
     };
 
     let ctx = CheckContext::new(&source);
@@ -612,8 +679,9 @@ fn check_file(
     let root = CstNode::new(result.tree.root_node(), &source);
     suppression_ctx.parse_suppress_warnings(&source, &root);
 
-    let mut violations = 0;
-    let mut fixable = 0;
+    let mut violation_messages = Vec::new();
+    let mut violation_count = 0;
+    let mut fixable_count = 0;
 
     for node in TreeWalker::new(root.inner(), &source) {
         for rule in rules {
@@ -624,24 +692,28 @@ fn check_file(
                     continue;
                 }
 
-                violations += 1;
+                violation_count += 1;
                 if diagnostic.fix.is_some() {
-                    fixable += 1;
+                    fixable_count += 1;
                 }
 
                 let source_code = ctx.source_code();
                 let loc = source_code.line_column(diagnostic.range.start());
-                println!(
+                violation_messages.push(format!(
                     "{}:{}:{}: {} {}",
                     path.display(),
                     loc.line.get(),
                     loc.column.get(),
                     format!("[{}]", rule.name()).blue(),
                     diagnostic.kind.body
-                );
+                ));
             }
         }
     }
 
-    Ok((violations, fixable))
+    Ok(FileCheckResult {
+        violations: violation_messages,
+        violation_count,
+        fixable_count,
+    })
 }

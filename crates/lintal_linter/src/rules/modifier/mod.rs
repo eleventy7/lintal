@@ -1,5 +1,6 @@
 //! Modifier rules for checking modifier usage and ordering.
 
 pub mod common;
+pub mod modifier_order;
 
-// Rules will be added as they're implemented
+pub use modifier_order::ModifierOrder;

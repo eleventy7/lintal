@@ -8,4 +8,5 @@ pub mod whitespace;
 pub use blocks::{
     AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, LeftCurly, NeedBraces, RightCurly,
 };
+pub use modifier::ModifierOrder;
 pub use whitespace::*;

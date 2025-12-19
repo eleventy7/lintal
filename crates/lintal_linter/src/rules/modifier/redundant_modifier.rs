@@ -376,7 +376,7 @@ impl RedundantModifier {
     fn find_enclosing_class<'a>(&self, node: &CstNode<'a>) -> Option<CstNode<'a>> {
         let mut current = node.parent();
         while let Some(parent) = current {
-            if parent.kind() == "class_declaration" {
+            if matches!(parent.kind(), "class_declaration" | "record_declaration") {
                 return Some(parent);
             }
             current = parent.parent();
@@ -396,8 +396,14 @@ impl RedundantModifier {
     /// Check if a class is accessible from public scope.
     /// A class is public-accessible if:
     /// - It's a top-level class with public modifier, OR
-    /// - It's a nested class with public modifier AND its parent class is also public-accessible
+    /// - It's a nested class with public modifier AND its parent class is also public-accessible, OR
+    /// - It's nested directly inside an interface or annotation (implicitly public)
     fn is_class_public(&self, class_def: &CstNode) -> bool {
+        // Check if this class is nested inside an interface/annotation (implicitly public)
+        if self.is_direct_child_of_interface_or_annotation(class_def) {
+            return true;
+        }
+
         // Check if this class has public modifier
         let has_public = class_def
             .children()
@@ -434,6 +440,10 @@ impl RedundantModifier {
     fn is_in_final_class(&self, node: &CstNode) -> bool {
         let mut current = node.parent();
         while let Some(parent) = current {
+            // Stop at enum boundary - enum methods can be overridden by enum constant bodies
+            if parent.kind() == "enum_declaration" {
+                return false;
+            }
             if parent.kind() == "class_declaration" {
                 if let Some(modifiers) = parent.children().find(|c| c.kind() == "modifiers") {
                     return self.find_modifier(&modifiers, "final").is_some();

@@ -12,7 +12,6 @@ use crate::{CheckContext, FromConfig, Properties, Rule};
 #[derive(Debug, Clone)]
 pub struct RedundantModifier {
     /// JDK version for version-specific checks (e.g., strictfp in JDK 17+)
-    #[allow(dead_code)] // Will be used in Task 9 for strictfp check
     jdk_version: u32,
 }
 
@@ -64,7 +63,15 @@ impl Rule for RedundantModifier {
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
-        match node.kind() {
+        // Check for redundant strictfp modifier (JDK 17+)
+        let mut diagnostics = if self.jdk_version >= 17 {
+            self.check_strictfp_modifier(ctx, node)
+        } else {
+            vec![]
+        };
+
+        // Add node-specific checks
+        diagnostics.extend(match node.kind() {
             "interface_declaration" | "annotation_type_declaration" => {
                 self.check_interface_modifiers(ctx, node)
             }
@@ -74,11 +81,14 @@ impl Rule for RedundantModifier {
             }
             "class_declaration" => self.check_class_modifiers(ctx, node),
             "enum_declaration" => self.check_enum_modifiers(ctx, node),
+            "record_declaration" => self.check_record_modifiers(ctx, node),
             "constructor_declaration" => self.check_constructor_modifiers(ctx, node),
             "try_with_resources_statement" => self.check_try_with_resources(ctx, node),
             "formal_parameter" => self.check_parameter_modifiers(ctx, node),
             _ => vec![],
-        }
+        });
+
+        diagnostics
     }
 }
 
@@ -336,7 +346,8 @@ impl RedundantModifier {
                 "class_declaration"
                 | "interface_declaration"
                 | "enum_declaration"
-                | "annotation_type_declaration" => return true,
+                | "annotation_type_declaration"
+                | "record_declaration" => return true,
                 _ => current = parent.parent(),
             }
         }
@@ -574,6 +585,72 @@ impl RedundantModifier {
             node.range(),
         )
     }
+
+    /// Check for redundant modifiers on record declarations.
+    fn check_record_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        let modifiers = node
+            .children()
+            .find(|child| child.kind() == "modifiers");
+
+        if let Some(modifiers) = modifiers {
+            // Records are implicitly final
+            if let Some(final_mod) = self.find_modifier(&modifiers, "final") {
+                diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+            }
+
+            // Nested records are implicitly static
+            if self.is_nested(node)
+                && let Some(static_mod) = self.find_modifier(&modifiers, "static")
+            {
+                diagnostics.push(self.create_diagnostic(ctx, &static_mod, "static"));
+            }
+
+            // Records inside interfaces are also implicitly public
+            if self.is_direct_child_of_interface_or_annotation(node)
+                && let Some(public_mod) = self.find_modifier(&modifiers, "public")
+            {
+                diagnostics.push(self.create_diagnostic(ctx, &public_mod, "public"));
+            }
+        }
+
+        diagnostics
+    }
+
+    /// Check for redundant strictfp modifier (JDK 17+).
+    /// In JDK 17+, strictfp is redundant on all declarations.
+    fn check_strictfp_modifier(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Only check nodes that can have modifiers
+        let can_have_modifiers = matches!(
+            node.kind(),
+            "class_declaration"
+                | "interface_declaration"
+                | "annotation_type_declaration"
+                | "enum_declaration"
+                | "record_declaration"
+                | "method_declaration"
+                | "annotation_type_element_declaration"
+        );
+
+        if !can_have_modifiers {
+            return diagnostics;
+        }
+
+        let modifiers = node
+            .children()
+            .find(|child| child.kind() == "modifiers");
+
+        if let Some(modifiers) = modifiers
+            && let Some(strictfp_mod) = self.find_modifier(&modifiers, "strictfp")
+        {
+            diagnostics.push(self.create_diagnostic(ctx, &strictfp_mod, "strictfp"));
+        }
+
+        diagnostics
+    }
 }
 
 #[cfg(test)]
@@ -719,5 +796,37 @@ mod tests {
             .kind
             .body
             .contains("Redundant 'final' modifier"));
+    }
+
+    #[test]
+    fn test_record_in_record() {
+        let source = "record Outer() { static record Nested() {} }";
+        let diagnostics = check_source(source, None);
+        // Should find static modifier on nested record as redundant
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0]
+            .kind
+            .body
+            .contains("Redundant 'static' modifier"));
+    }
+
+    #[test]
+    fn test_strictfp_jdk17() {
+        let source = "strictfp class Test {}";
+        let diagnostics = check_source(source, Some(17));
+        // strictfp is redundant in JDK 17+
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0]
+            .kind
+            .body
+            .contains("Redundant 'strictfp' modifier"));
+    }
+
+    #[test]
+    fn test_strictfp_jdk16() {
+        let source = "strictfp class Test {}";
+        let diagnostics = check_source(source, Some(16));
+        // strictfp is NOT redundant before JDK 17
+        assert_eq!(diagnostics.len(), 0);
     }
 }

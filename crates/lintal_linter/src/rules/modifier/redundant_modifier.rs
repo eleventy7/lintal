@@ -75,6 +75,8 @@ impl Rule for RedundantModifier {
             "class_declaration" => self.check_class_modifiers(ctx, node),
             "enum_declaration" => self.check_enum_modifiers(ctx, node),
             "constructor_declaration" => self.check_constructor_modifiers(ctx, node),
+            "try_with_resources_statement" => self.check_try_with_resources(ctx, node),
+            "formal_parameter" => self.check_parameter_modifiers(ctx, node),
             _ => vec![],
         }
     }
@@ -476,6 +478,91 @@ impl RedundantModifier {
             }
         }
         false
+    }
+
+    /// Check for redundant final modifier on try-with-resources variables.
+    fn check_try_with_resources(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Get the resources field which contains the resource specification
+        if let Some(resources) = node.child_by_field_name("resources") {
+            // The resources node is a resource_specification which contains resource nodes
+            for resource in resources.children() {
+                // Each resource can be either:
+                // - A resource (local variable declaration with optional final)
+                // - An identifier (reference to an existing variable)
+                if resource.kind() == "resource" {
+                    // Check if the resource has modifiers
+                    if let Some(modifiers) = resource.children().find(|c| c.kind() == "modifiers") {
+                        // Check for final modifier
+                        if let Some(final_mod) = self.find_modifier(&modifiers, "final") {
+                            diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+                        }
+                    }
+                }
+            }
+        }
+
+        diagnostics
+    }
+
+    /// Check for redundant final modifier on parameters of abstract/interface/native methods.
+    fn check_parameter_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        // Check if this parameter belongs to a method that cannot have a body
+        // (abstract, interface, or native)
+        if let Some(method) = self.find_parent_method(node) {
+            // Check if it's an interface method (always abstract unless default/static)
+            let is_interface_method = self.is_in_interface_or_annotation(&method);
+
+            // Check if it's an abstract method
+            let is_abstract = if let Some(modifiers) = method.children().find(|c| c.kind() == "modifiers") {
+                self.find_modifier(&modifiers, "abstract").is_some() ||
+                self.find_modifier(&modifiers, "native").is_some()
+            } else {
+                false
+            };
+
+            // For interface methods, check if they have default or static (which means they have body)
+            let has_body = if is_interface_method {
+                if let Some(modifiers) = method.children().find(|c| c.kind() == "modifiers") {
+                    self.find_modifier(&modifiers, "default").is_some() ||
+                    self.find_modifier(&modifiers, "static").is_some()
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            // Check if final is redundant (abstract/interface/native methods without body)
+            if (is_abstract || is_interface_method) && !has_body {
+                // Check if the parameter has a final modifier
+                if let Some(modifiers) = node.children().find(|c| c.kind() == "modifiers")
+                    && let Some(final_mod) = self.find_modifier(&modifiers, "final")
+                {
+                    diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
+                }
+            }
+        }
+
+        diagnostics
+    }
+
+    /// Find the parent method declaration for a parameter.
+    fn find_parent_method<'a>(&self, node: &CstNode<'a>) -> Option<CstNode<'a>> {
+        let mut current = node.parent();
+        while let Some(parent) = current {
+            if matches!(
+                parent.kind(),
+                "method_declaration" | "annotation_type_element_declaration"
+            ) {
+                return Some(parent);
+            }
+            current = parent.parent();
+        }
+        None
     }
 
     /// Create a diagnostic for a redundant modifier.

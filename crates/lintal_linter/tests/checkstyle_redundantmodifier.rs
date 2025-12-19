@@ -338,3 +338,64 @@ fn test_enum_methods() {
 
     verify_violations(&violations, &expected);
 }
+
+#[test]
+fn test_final_in_try_with_resource() {
+    let Some(source) =
+        load_redundantmodifier_fixture("InputRedundantModifierFinalInTryWithResource.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let violations = check_redundant_modifier(&source, None);
+
+    // Final on try-with-resources variables is redundant
+    let expected = vec![
+        Violation::new(38, 14, "final"),
+        Violation::new(43, 14, "final"),
+        Violation::new(44, 17, "final"),
+    ];
+
+    verify_violations(&violations, &expected);
+}
+
+#[test]
+fn test_try_with_resources_block() {
+    let Some(source) =
+        load_redundantmodifier_fixture("InputRedundantModifierTryWithResources.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let violations = check_redundant_modifier(&source, None);
+
+    // Final on try-with-resources variables is redundant
+    let expected = vec![Violation::new(18, 19, "final")];
+
+    verify_violations(&violations, &expected);
+}
+
+#[test]
+fn test_final_in_abstract_methods() {
+    let Some(source) =
+        load_redundantmodifier_fixture("InputRedundantModifierFinalInAbstractMethods.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let violations = check_redundant_modifier(&source, None);
+
+    // Final on abstract method parameters is redundant
+    let expected = vec![
+        Violation::new(12, 33, "final"), // abstract method
+        Violation::new(16, 49, "final"), // abstract method
+        Violation::new(19, 17, "final"), // interface method
+        Violation::new(24, 24, "final"), // native method
+        Violation::new(33, 33, "final"), // abstract method in enum
+    ];
+
+    verify_violations(&violations, &expected);
+}

@@ -167,14 +167,10 @@ impl FinalParameters {
 
         let mut diagnostics = vec![];
         for child in parameters.children() {
-            if child.kind() == "formal_parameter" {
-                if let Some(diagnostic) = self.check_param(ctx, &child) {
-                    diagnostics.push(diagnostic);
-                }
-            } else if child.kind() == "spread_parameter" {
-                if let Some(diagnostic) = self.check_param(ctx, &child) {
-                    diagnostics.push(diagnostic);
-                }
+            if matches!(child.kind(), "formal_parameter" | "spread_parameter")
+                && let Some(diagnostic) = self.check_param(ctx, &child)
+            {
+                diagnostics.push(diagnostic);
             }
         }
         diagnostics
@@ -188,14 +184,10 @@ impl FinalParameters {
 
         let mut diagnostics = vec![];
         for child in parameters.children() {
-            if child.kind() == "formal_parameter" {
-                if let Some(diagnostic) = self.check_param(ctx, &child) {
-                    diagnostics.push(diagnostic);
-                }
-            } else if child.kind() == "spread_parameter" {
-                if let Some(diagnostic) = self.check_param(ctx, &child) {
-                    diagnostics.push(diagnostic);
-                }
+            if matches!(child.kind(), "formal_parameter" | "spread_parameter")
+                && let Some(diagnostic) = self.check_param(ctx, &child)
+            {
+                diagnostics.push(diagnostic);
             }
         }
         diagnostics
@@ -271,10 +263,11 @@ impl FinalParameters {
         }
 
         // Check if primitive type
-        if let Some(type_node) = type_node {
-            if self.ignore_primitive_types && self.is_primitive_type(ctx, &type_node) {
-                return vec![];
-            }
+        if let Some(type_node) = type_node
+            && self.ignore_primitive_types
+            && self.is_primitive_type(ctx, &type_node)
+        {
+            return vec![];
         }
 
         // Find the first node for reporting
@@ -320,10 +313,11 @@ impl FinalParameters {
         }
 
         // Check if primitive type
-        if let Some(type_node) = param.child_by_field_name("type") {
-            if self.ignore_primitive_types && self.is_primitive_type(ctx, &type_node) {
-                return None;
-            }
+        if let Some(type_node) = param.child_by_field_name("type")
+            && self.ignore_primitive_types
+            && self.is_primitive_type(ctx, &type_node)
+        {
+            return None;
         }
 
         // Find the first node to report on - this is the leftmost leaf node

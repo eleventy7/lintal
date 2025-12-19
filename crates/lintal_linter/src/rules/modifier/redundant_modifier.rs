@@ -11,6 +11,8 @@ use crate::{CheckContext, FromConfig, Properties, Rule};
 /// Configuration for RedundantModifier rule.
 #[derive(Debug, Clone)]
 pub struct RedundantModifier {
+    /// JDK version for version-specific checks (e.g., strictfp in JDK 17+)
+    #[allow(dead_code)] // Will be used in Task 9 for strictfp check
     jdk_version: u32,
 }
 
@@ -35,8 +37,8 @@ impl FromConfig for RedundantModifier {
 /// Parse JDK version string (supports "1.8" or "8" format).
 fn parse_jdk_version(version_str: &str) -> Option<u32> {
     let version_str = version_str.trim();
-    if version_str.starts_with("1.") {
-        version_str[2..].parse().ok()
+    if let Some(stripped) = version_str.strip_prefix("1.") {
+        stripped.parse().ok()
     } else {
         version_str.parse().ok()
     }
@@ -156,10 +158,11 @@ impl RedundantModifier {
             }
 
             // Abstract is redundant for non-static, non-default methods
-            if !has_default && !has_static {
-                if let Some(abstract_mod) = self.find_modifier(&modifiers, "abstract") {
-                    diagnostics.push(self.create_diagnostic(ctx, &abstract_mod, "abstract"));
-                }
+            if !has_default
+                && !has_static
+                && let Some(abstract_mod) = self.find_modifier(&modifiers, "abstract")
+            {
+                diagnostics.push(self.create_diagnostic(ctx, &abstract_mod, "abstract"));
             }
         }
 
@@ -206,17 +209,17 @@ impl RedundantModifier {
 
         if let Some(modifiers) = modifiers {
             // Nested enums are implicitly static
-            if is_nested {
-                if let Some(static_mod) = self.find_modifier(&modifiers, "static") {
-                    diagnostics.push(self.create_diagnostic(ctx, &static_mod, "static"));
-                }
+            if is_nested
+                && let Some(static_mod) = self.find_modifier(&modifiers, "static")
+            {
+                diagnostics.push(self.create_diagnostic(ctx, &static_mod, "static"));
             }
 
             // Enums inside interfaces are also implicitly public
-            if self.is_direct_child_of_interface_or_annotation(node) {
-                if let Some(public_mod) = self.find_modifier(&modifiers, "public") {
-                    diagnostics.push(self.create_diagnostic(ctx, &public_mod, "public"));
-                }
+            if self.is_direct_child_of_interface_or_annotation(node)
+                && let Some(public_mod) = self.find_modifier(&modifiers, "public")
+            {
+                diagnostics.push(self.create_diagnostic(ctx, &public_mod, "public"));
             }
         }
 
@@ -236,7 +239,17 @@ impl RedundantModifier {
         while let Some(parent) = current {
             match parent.kind() {
                 "interface_declaration" | "annotation_type_declaration" => return true,
-                "class_declaration" => return false, // Stop at class boundary
+                // Stop at class boundaries (regular or anonymous)
+                "class_declaration" | "enum_declaration" => return false,
+                // Anonymous class: class_body inside object_creation_expression
+                "class_body" => {
+                    if let Some(grandparent) = parent.parent()
+                        && grandparent.kind() == "object_creation_expression"
+                    {
+                        return false; // Stop at anonymous class
+                    }
+                    current = parent.parent();
+                }
                 _ => current = parent.parent(),
             }
         }
@@ -245,10 +258,10 @@ impl RedundantModifier {
 
     /// Check if a node is a direct child of an interface or annotation body.
     fn is_direct_child_of_interface_or_annotation(&self, node: &CstNode) -> bool {
-        if let Some(parent) = node.parent() {
-            if parent.kind() == "interface_body" || parent.kind() == "annotation_type_body" {
-                return true;
-            }
+        if let Some(parent) = node.parent()
+            && matches!(parent.kind(), "interface_body" | "annotation_type_body")
+        {
+            return true;
         }
         false
     }

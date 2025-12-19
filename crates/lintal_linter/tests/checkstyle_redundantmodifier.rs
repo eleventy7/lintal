@@ -139,15 +139,15 @@ fn test_it_one() {
 
     let violations = check_redundant_modifier(&source, Some("11"));
 
+    // Task 5: Interface/annotation modifier violations only
+    // Lines 82, 91 are Task 7 (final methods in private/final class)
     let expected = vec![
-        Violation::new(57, 12, "static"),
-        Violation::new(60, 9, "public"),
-        Violation::new(66, 9, "abstract"),
-        Violation::new(69, 9, "public"),
-        Violation::new(75, 9, "final"),
-        Violation::new(82, 13, "final"),
-        Violation::new(91, 12, "final"),
-        Violation::new(102, 1, "abstract"),
+        Violation::new(57, 12, "static"),   // static nested interface
+        Violation::new(60, 9, "public"),    // public interface method
+        Violation::new(66, 9, "abstract"),  // abstract interface method
+        Violation::new(69, 9, "public"),    // public interface field
+        Violation::new(75, 9, "final"),     // final interface field
+        Violation::new(102, 1, "abstract"), // abstract interface definition
     ];
 
     verify_violations(&violations, &expected);

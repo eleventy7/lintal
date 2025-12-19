@@ -74,6 +74,7 @@ impl Rule for RedundantModifier {
             }
             "class_declaration" => self.check_class_modifiers(ctx, node),
             "enum_declaration" => self.check_enum_modifiers(ctx, node),
+            "constructor_declaration" => self.check_constructor_modifiers(ctx, node),
             _ => vec![],
         }
     }
@@ -226,6 +227,36 @@ impl RedundantModifier {
         diagnostics
     }
 
+    /// Check for redundant modifiers on constructor declarations.
+    fn check_constructor_modifiers(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+
+        let modifiers = node
+            .children()
+            .find(|child| child.kind() == "modifiers");
+
+        if let Some(modifiers) = modifiers {
+            // Check if constructor is in an enum - all visibility modifiers are redundant
+            if self.is_in_enum(node) {
+                // Any visibility modifier on enum constructor is redundant
+                for visibility in ["public", "protected", "private"] {
+                    if let Some(vis_mod) = self.find_modifier(&modifiers, visibility) {
+                        diagnostics.push(self.create_diagnostic(ctx, &vis_mod, visibility));
+                    }
+                }
+            } else {
+                // Check if the constructor is public in a non-public class
+                if let Some(public_mod) = self.find_modifier(&modifiers, "public")
+                    && !self.is_constructor_in_public_accessible_class(node)
+                {
+                    diagnostics.push(self.create_diagnostic(ctx, &public_mod, "public"));
+                }
+            }
+        }
+
+        diagnostics
+    }
+
     /// Find a modifier by name in a modifiers node.
     fn find_modifier<'a>(&self, modifiers: &CstNode<'a>, modifier_name: &str) -> Option<CstNode<'a>> {
         modifiers
@@ -278,6 +309,89 @@ impl RedundantModifier {
                 _ => current = parent.parent(),
             }
         }
+        false
+    }
+
+    /// Check if a node is inside an enum definition.
+    fn is_in_enum(&self, node: &CstNode) -> bool {
+        let mut current = node.parent();
+        while let Some(parent) = current {
+            if parent.kind() == "enum_declaration" {
+                return true;
+            }
+            current = parent.parent();
+        }
+        false
+    }
+
+    /// Check if a constructor is in a class that is publicly accessible or protected.
+    /// Per checkstyle: public modifier on constructor is redundant if the class is
+    /// neither public (accessible from public scope) nor protected.
+    fn is_constructor_in_public_accessible_class(&self, constructor: &CstNode) -> bool {
+        // Find the enclosing class declaration
+        if let Some(class_def) = self.find_enclosing_class(constructor) {
+            // Check if class is protected or public-accessible
+            self.is_class_protected(&class_def) || self.is_class_public(&class_def)
+        } else {
+            false
+        }
+    }
+
+    /// Find the enclosing class declaration for a node.
+    fn find_enclosing_class<'a>(&self, node: &CstNode<'a>) -> Option<CstNode<'a>> {
+        let mut current = node.parent();
+        while let Some(parent) = current {
+            if parent.kind() == "class_declaration" {
+                return Some(parent);
+            }
+            current = parent.parent();
+        }
+        None
+    }
+
+    /// Check if a class is protected.
+    fn is_class_protected(&self, class_def: &CstNode) -> bool {
+        class_def
+            .children()
+            .find(|child| child.kind() == "modifiers")
+            .map(|modifiers| self.find_modifier(&modifiers, "protected").is_some())
+            .unwrap_or(false)
+    }
+
+    /// Check if a class is accessible from public scope.
+    /// A class is public-accessible if:
+    /// - It's a top-level class with public modifier, OR
+    /// - It's a nested class with public modifier AND its parent class is also public-accessible
+    fn is_class_public(&self, class_def: &CstNode) -> bool {
+        // Check if this class has public modifier
+        let has_public = class_def
+            .children()
+            .find(|child| child.kind() == "modifiers")
+            .map(|modifiers| self.find_modifier(&modifiers, "public").is_some())
+            .unwrap_or(false);
+
+        if !has_public {
+            return false;
+        }
+
+        // Check if this is a top-level class (parent is program)
+        if let Some(parent) = class_def.parent() {
+            if parent.kind() == "program" {
+                return true; // Top-level public class
+            }
+
+            // Check if it's a nested class - find parent class
+            if parent.kind() == "class_body"
+                && let Some(parent_class) = parent.parent()
+                && parent_class.kind() == "class_declaration"
+            {
+                // Recursively check if parent class is public
+                return self.is_class_public(&parent_class);
+            }
+        }
+
+        // If we can't determine parent, conservatively assume not accessible
+        // to avoid false negatives (not flagging a truly redundant modifier)
         false
     }
 

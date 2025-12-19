@@ -193,3 +193,75 @@ fn test_classes_inside_of_interfaces() {
 
     verify_violations(&violations, &expected);
 }
+
+#[test]
+fn test_enum_constructor_is_implicitly_private() {
+    let Some(source) =
+        load_redundantmodifier_fixture("InputRedundantModifierConstructorModifier.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let violations = check_redundant_modifier(&source, None);
+
+    // Enum constructors are implicitly private
+    let expected = vec![Violation::new(14, 5, "private")];
+
+    verify_violations(&violations, &expected);
+}
+
+#[test]
+fn test_annotation_on_enum_constructor() {
+    let Some(source) =
+        load_redundantmodifier_fixture("InputRedundantModifierAnnotationOnEnumConstructor.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let violations = check_redundant_modifier(&source, None);
+
+    // Private modifier is redundant even with annotation
+    let expected = vec![Violation::new(22, 5, "private")];
+
+    verify_violations(&violations, &expected);
+}
+
+#[test]
+fn test_not_public_class_constructor_has_not_public_modifier() {
+    let Some(source) = load_redundantmodifier_fixture(
+        "InputRedundantModifierPublicModifierInNotPublicClass.java",
+    ) else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let violations = check_redundant_modifier(&source, None);
+
+    // Public modifier is redundant on constructor of non-public class
+    let expected = vec![Violation::new(22, 5, "public")];
+
+    verify_violations(&violations, &expected);
+}
+
+#[test]
+fn test_nested_static_enum() {
+    let Some(source) =
+        load_redundantmodifier_fixture("InputRedundantModifierStaticModifierInNestedEnum.java")
+    else {
+        eprintln!("Skipping test: checkstyle repo not available");
+        return;
+    };
+
+    let violations = check_redundant_modifier(&source, None);
+
+    // Nested enums are implicitly static
+    let expected = vec![
+        Violation::new(12, 5, "static"), // nested in class
+        Violation::new(16, 9, "static"), // nested in enum
+        Violation::new(20, 9, "static"), // nested in interface
+    ];
+
+    verify_violations(&violations, &expected);
+}

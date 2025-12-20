@@ -16,12 +16,13 @@ lintal is tested against real-world projects including [Aeron](https://github.co
 
 lintal is significantly faster than checkstyle due to native compilation and parallel processing.
 
-**Benchmark on [Aeron](https://github.com/aeron-io/aeron)** (1,208 Java files):
+**Benchmark vs Checkstyle 12.3.0** (same files, same config):
 
-| Tool | Time | Speedup |
-|------|------|---------|
-| Checkstyle (via Gradle) | 10.4s | baseline |
-| lintal | 1.2s | **8.4x faster** |
+| Repository | Files | Checkstyle | lintal | Speedup |
+|------------|-------|------------|--------|---------|
+| Agrona | 172 | 1.35s | 0.16s | **8.4x** |
+| Artio | 428 | 2.0s | 0.39s | **5.1x** |
+| Aeron | 528 | 3.5s | 1.4s | **2.5x** |
 
 Key factors:
 - Native binary with no JVM startup overhead

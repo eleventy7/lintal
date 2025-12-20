@@ -73,13 +73,98 @@ impl Rule for RedundantImport {
         "RedundantImport"
     }
 
-    fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+    fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
         // Only check at program level (once per file)
         if node.kind() != "program" {
             return vec![];
         }
 
-        // TODO: Implement in next task
-        vec![]
+        let source = ctx.source();
+        let line_index = LineIndex::from_source_text(source);
+        let ts_node = node.inner();
+
+        let imports = collect_imports(ts_node, source, &line_index);
+        let current_package = get_package_name(ts_node, source);
+
+        let mut diagnostics = Vec::new();
+        let mut seen: HashMap<&str, usize> = HashMap::new();
+
+        for import in &imports {
+            // Check for duplicate
+            if let Some(&first_line) = seen.get(import.path.as_str()) {
+                diagnostics.push(
+                    Diagnostic::new(DuplicateImport { first_line }, import.range)
+                        .with_fix(self.create_delete_fix(import, source))
+                );
+                continue;
+            }
+            seen.insert(&import.path, import.line);
+
+            // Check for java.lang import
+            if self.is_java_lang_import(import) {
+                diagnostics.push(
+                    Diagnostic::new(JavaLangImport, import.range)
+                        .with_fix(self.create_delete_fix(import, source))
+                );
+                continue;
+            }
+
+            // Check for same-package import
+            if let Some(ref pkg) = current_package {
+                if self.is_same_package_import(import, pkg) {
+                    diagnostics.push(
+                        Diagnostic::new(SamePackageImport, import.range)
+                            .with_fix(self.create_delete_fix(import, source))
+                    );
+                }
+            }
+        }
+
+        diagnostics
+    }
+}
+
+impl RedundantImport {
+    fn is_java_lang_import(&self, import: &ImportInfo) -> bool {
+        // Static imports from java.lang are NOT redundant
+        if import.is_static {
+            return false;
+        }
+
+        import.path.starts_with("java.lang.")
+            || import.path == "java.lang.*"
+    }
+
+    fn is_same_package_import(&self, import: &ImportInfo, current_package: &str) -> bool {
+        // Static imports from same package are NOT redundant
+        if import.is_static {
+            return false;
+        }
+
+        if import.is_wildcard {
+            // "import pkg.*" where pkg matches current package
+            import.package() == Some(current_package)
+        } else {
+            // "import pkg.Class" where pkg matches current package
+            import.package() == Some(current_package)
+        }
+    }
+
+    fn create_delete_fix(&self, import: &ImportInfo, source: &str) -> Fix {
+        // Include trailing newline in deletion for clean output
+        let end = import.range.end();
+        let remaining = &source[end.to_usize()..];
+        let newline_len = if remaining.starts_with("\r\n") {
+            2
+        } else if remaining.starts_with('\n') {
+            1
+        } else {
+            0
+        };
+
+        let delete_end = end + TextSize::from(newline_len as u32);
+        let delete_range = TextRange::new(import.range.start(), delete_end);
+
+        Fix::safe_edit(Edit::range_deletion(delete_range))
     }
 }

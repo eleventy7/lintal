@@ -1,3 +1,50 @@
 [tools]
 java = "25"
 rust = "1.92"
+python = "3.12"
+uv = "latest"
+
+[tasks.build]
+description = "Build in release mode"
+run = "cargo build --release"
+
+[tasks.build-debug]
+description = "Build in debug mode"
+run = "cargo build"
+
+[tasks.fmt]
+description = "Format code with rustfmt"
+run = "cargo fmt --all"
+
+[tasks.clippy]
+description = "Run clippy lints"
+run = "cargo clippy --all-targets --all-features -- -D warnings"
+
+[tasks.check]
+description = "Run fmt and clippy checks"
+depends = ["fmt", "clippy"]
+
+[tasks.test]
+description = "Run all tests"
+run = "cargo test --all"
+
+[tasks.clone-test-repos]
+description = "Clone aeron, artio, and agrona for real-world testing"
+run = """
+mkdir -p target
+[ -d target/aeron ] || git clone https://github.com/aeron-io/aeron.git target/aeron
+[ -d target/artio ] || git clone https://github.com/artiofix/artio.git target/artio
+[ -d target/agrona ] || git clone https://github.com/aeron-io/agrona.git target/agrona
+"""
+
+[tasks.download-checkstyle]
+description = "Download checkstyle jar for benchmarking"
+run = """
+mkdir -p target
+[ -f target/checkstyle-12.3.0-all.jar ] || curl -L -o target/checkstyle-12.3.0-all.jar https://github.com/checkstyle/checkstyle/releases/download/checkstyle-12.3.0/checkstyle-12.3.0-all.jar
+"""
+
+[tasks.benchmark]
+description = "Run performance benchmark comparing lintal vs checkstyle"
+depends = ["build", "clone-test-repos", "download-checkstyle"]
+run = "uv run python scripts/benchmark.py"

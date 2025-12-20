@@ -1,0 +1,11 @@
+[project]
+name = "lintal-scripts"
+version = "0.1.0"
+description = "Benchmark and utility scripts for lintal"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.8",
+]
+
+[project.scripts]
+benchmark = "scripts.benchmark:main"

@@ -2,6 +2,7 @@
 
 pub mod blocks;
 pub mod modifier;
+pub mod style;
 pub mod whitespace;
 
 // Re-export all rules
@@ -9,4 +10,5 @@ pub use blocks::{
     AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, LeftCurly, NeedBraces, RightCurly,
 };
 pub use modifier::{FinalLocalVariable, FinalParameters, ModifierOrder, RedundantModifier};
+pub use style::{ArrayTypeStyle, UpperEll};
 pub use whitespace::*;

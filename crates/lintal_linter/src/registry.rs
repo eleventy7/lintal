@@ -49,12 +49,13 @@ impl RuleRegistry {
     /// Register all built-in rules.
     fn register_builtins(&mut self) {
         use crate::rules::{
-            AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
+            ArrayTypeStyle, AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
             FileTabCharacter, FinalLocalVariable, FinalParameters, LeftCurly, MethodParamPad,
             ModifierOrder, NeedBraces, NoWhitespaceAfter, NoWhitespaceBefore, ParenPad,
-            RedundantModifier, RightCurly, SingleSpaceSeparator, TypecastParenPad, WhitespaceAfter,
-            WhitespaceAround,
+            RedundantModifier, RightCurly, SingleSpaceSeparator, TypecastParenPad, UpperEll,
+            WhitespaceAfter, WhitespaceAround,
         };
+        // Whitespace rules
         self.register::<WhitespaceAround>();
         self.register::<WhitespaceAfter>();
         self.register::<NoWhitespaceAfter>();
@@ -65,16 +66,21 @@ impl RuleRegistry {
         self.register::<EmptyForInitializerPad>();
         self.register::<TypecastParenPad>();
         self.register::<FileTabCharacter>();
+        // Block rules
         self.register::<LeftCurly>();
         self.register::<RightCurly>();
         self.register::<NeedBraces>();
         self.register::<EmptyBlock>();
         self.register::<EmptyCatchBlock>();
         self.register::<AvoidNestedBlocks>();
+        // Modifier rules
         self.register::<ModifierOrder>();
         self.register::<FinalParameters>();
         self.register::<RedundantModifier>();
         self.register::<FinalLocalVariable>();
+        // Style rules
+        self.register::<UpperEll>();
+        self.register::<ArrayTypeStyle>();
     }
 
     /// Create a rule from a module name and properties.

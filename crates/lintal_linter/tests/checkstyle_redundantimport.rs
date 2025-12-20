@@ -64,7 +64,8 @@ fn test_redundant_import_with_checker() {
     for expected_line in &expected_lines {
         assert!(
             violations.iter().any(|(line, _)| line == expected_line),
-            "Expected violation on line {}", expected_line
+            "Expected violation on line {}",
+            expected_line
         );
     }
 }
@@ -80,6 +81,7 @@ fn test_no_false_positives() {
 
     assert!(
         violations.is_empty(),
-        "Expected no violations, got: {:?}", violations
+        "Expected no violations, got: {:?}",
+        violations
     );
 }

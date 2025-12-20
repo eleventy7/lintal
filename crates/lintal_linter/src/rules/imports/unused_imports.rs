@@ -11,7 +11,7 @@ use lintal_text_size::{TextRange, TextSize};
 
 use crate::{CheckContext, FromConfig, Properties, Rule};
 
-use super::common::{collect_imports, collect_type_usages, collect_javadoc_references, ImportInfo};
+use super::common::{ImportInfo, collect_imports, collect_javadoc_references, collect_type_usages};
 
 /// Violation: import is unused.
 #[derive(Debug, Clone)]
@@ -89,18 +89,18 @@ impl Rule for UnusedImports {
             }
 
             // Check if the simple name is used
-            if let Some(ref simple_name) = import.simple_name {
-                if !usages.contains(simple_name) {
-                    diagnostics.push(
-                        Diagnostic::new(
-                            UnusedImportViolation {
-                                import_path: import.path.clone()
-                            },
-                            import.range
-                        )
-                        .with_fix(self.create_delete_fix(import, source))
-                    );
-                }
+            if let Some(ref simple_name) = import.simple_name
+                && !usages.contains(simple_name)
+            {
+                diagnostics.push(
+                    Diagnostic::new(
+                        UnusedImportViolation {
+                            import_path: import.path.clone(),
+                        },
+                        import.range,
+                    )
+                    .with_fix(self.create_delete_fix(import, source)),
+                );
             }
         }
 
@@ -215,7 +215,10 @@ class Test {
 }
 "#;
         let diagnostics = check_source(source);
-        assert!(diagnostics.is_empty(), "JToolBar should be marked as used via JToolBar.Separator");
+        assert!(
+            diagnostics.is_empty(),
+            "JToolBar should be marked as used via JToolBar.Separator"
+        );
     }
 
     #[test]
@@ -259,7 +262,10 @@ class Test {
 }
 "#;
         let diagnostics = check_source(source);
-        assert!(diagnostics.is_empty(), "IOException used in Javadoc @throws");
+        assert!(
+            diagnostics.is_empty(),
+            "IOException used in Javadoc @throws"
+        );
     }
 
     #[test]
@@ -273,7 +279,11 @@ import java.util.Date;
 class Test {}
 "#;
         let diagnostics = check_source_with_config(source, false);
-        assert_eq!(diagnostics.len(), 1, "Date should be unused when Javadoc processing disabled");
+        assert_eq!(
+            diagnostics.len(),
+            1,
+            "Date should be unused when Javadoc processing disabled"
+        );
     }
 
     #[test]

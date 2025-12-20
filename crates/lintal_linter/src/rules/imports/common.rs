@@ -52,26 +52,30 @@ fn collect_imports_recursive(
     source_code: &SourceCode,
     imports: &mut Vec<ImportInfo>,
 ) {
-    if node.kind() == "import_declaration" {
-        if let Some(info) = parse_import_declaration(node, source, source_code) {
-            imports.push(info);
-        }
+    if node.kind() == "import_declaration"
+        && let Some(info) = parse_import_declaration(node, source, source_code)
+    {
+        imports.push(info);
     }
 
     // Only recurse into program-level nodes, not into class bodies
     if node.kind() == "program" {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if child.kind() == "import_declaration" {
-                if let Some(info) = parse_import_declaration(child, source, source_code) {
-                    imports.push(info);
-                }
+            if child.kind() == "import_declaration"
+                && let Some(info) = parse_import_declaration(child, source, source_code)
+            {
+                imports.push(info);
             }
         }
     }
 }
 
-fn parse_import_declaration(node: Node, source: &str, source_code: &SourceCode) -> Option<ImportInfo> {
+fn parse_import_declaration(
+    node: Node,
+    source: &str,
+    source_code: &SourceCode,
+) -> Option<ImportInfo> {
     let start = TextSize::from(node.start_byte() as u32);
     let end = TextSize::from(node.end_byte() as u32);
     let range = TextRange::new(start, end);
@@ -186,10 +190,10 @@ fn collect_usages_recursive(node: Node, source: &str, usages: &mut HashSet<Strin
                 }
                 if child.kind() == "scoped_identifier" {
                     // @com.foo.Bar - get first identifier
-                    if let Some(first) = child.child(0) {
-                        if let Ok(text) = first.utf8_text(source.as_bytes()) {
-                            usages.insert(text.to_string());
-                        }
+                    if let Some(first) = child.child(0)
+                        && let Ok(text) = first.utf8_text(source.as_bytes())
+                    {
+                        usages.insert(text.to_string());
                     }
                     break;
                 }
@@ -198,28 +202,34 @@ fn collect_usages_recursive(node: Node, source: &str, usages: &mut HashSet<Strin
 
         // Method invocation on a type - e.g., Arrays.sort()
         "method_invocation" => {
-            if let Some(object) = node.child_by_field_name("object") {
-                if object.kind() == "identifier" {
-                    if let Ok(text) = object.utf8_text(source.as_bytes()) {
-                        // Check if it looks like a class name (starts with uppercase)
-                        if text.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
-                            usages.insert(text.to_string());
-                        }
-                    }
+            if let Some(object) = node.child_by_field_name("object")
+                && object.kind() == "identifier"
+                && let Ok(text) = object.utf8_text(source.as_bytes())
+            {
+                // Check if it looks like a class name (starts with uppercase)
+                if text
+                    .chars()
+                    .next()
+                    .map(|c| c.is_uppercase())
+                    .unwrap_or(false)
+                {
+                    usages.insert(text.to_string());
                 }
             }
         }
 
         // Field access on a type - e.g., System.out
         "field_access" => {
-            if let Some(object) = node.child_by_field_name("object") {
-                if object.kind() == "identifier" {
-                    if let Ok(text) = object.utf8_text(source.as_bytes()) {
-                        if text.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
-                            usages.insert(text.to_string());
-                        }
-                    }
-                }
+            if let Some(object) = node.child_by_field_name("object")
+                && object.kind() == "identifier"
+                && let Ok(text) = object.utf8_text(source.as_bytes())
+                && text
+                    .chars()
+                    .next()
+                    .map(|c| c.is_uppercase())
+                    .unwrap_or(false)
+            {
+                usages.insert(text.to_string());
             }
         }
 
@@ -247,12 +257,11 @@ pub fn collect_javadoc_references(root: Node, source: &str) -> HashSet<String> {
 }
 
 fn collect_javadoc_recursive(node: Node, source: &str, references: &mut HashSet<String>) {
-    if node.kind() == "block_comment" {
-        if let Ok(text) = node.utf8_text(source.as_bytes()) {
-            if text.starts_with("/**") {
-                parse_javadoc_types(text, references);
-            }
-        }
+    if node.kind() == "block_comment"
+        && let Ok(text) = node.utf8_text(source.as_bytes())
+        && text.starts_with("/**")
+    {
+        parse_javadoc_types(text, references);
     }
 
     let mut cursor = node.walk();
@@ -473,7 +482,10 @@ class Test {
 
         let usages = collect_type_usages(result.tree.root_node(), source);
 
-        assert!(usages.contains("JToolBar"), "Should capture outer class from inner class reference");
+        assert!(
+            usages.contains("JToolBar"),
+            "Should capture outer class from inner class reference"
+        );
     }
 
     #[test]

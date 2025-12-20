@@ -72,7 +72,8 @@ fn test_unused_imports_main() {
     }
 
     // Should have at least 6 of the expected violations
-    let found_count = expected_unused_lines.iter()
+    let found_count = expected_unused_lines
+        .iter()
         .filter(|line| violations.iter().any(|(l, _)| l == *line))
         .count();
 
@@ -100,13 +101,15 @@ fn test_no_false_positives() {
 
     assert!(
         violations.is_empty(),
-        "Expected no violations, got {} violations", violations.len()
+        "Expected no violations, got {} violations",
+        violations.len()
     );
 }
 
 #[test]
 fn test_javadoc_disabled() {
-    let Some(source) = load_fixture("InputUnusedImportsFromStaticMethodRefJavadocDisabled.java") else {
+    let Some(source) = load_fixture("InputUnusedImportsFromStaticMethodRefJavadocDisabled.java")
+    else {
         eprintln!("Skipping test: checkstyle repo not available");
         return;
     };

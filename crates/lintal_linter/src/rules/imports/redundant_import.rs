@@ -16,7 +16,7 @@ use lintal_text_size::{TextRange, TextSize};
 
 use crate::{CheckContext, FromConfig, Properties, Rule};
 
-use super::common::{collect_imports, get_package_name, ImportInfo};
+use super::common::{ImportInfo, collect_imports, get_package_name};
 
 /// Violation: import from same package.
 #[derive(Debug, Clone)]
@@ -94,7 +94,7 @@ impl Rule for RedundantImport {
             if let Some(&first_line) = seen.get(import.path.as_str()) {
                 diagnostics.push(
                     Diagnostic::new(DuplicateImport { first_line }, import.range)
-                        .with_fix(self.create_delete_fix(import, source))
+                        .with_fix(self.create_delete_fix(import, source)),
                 );
                 continue;
             }
@@ -104,19 +104,19 @@ impl Rule for RedundantImport {
             if self.is_java_lang_import(import) {
                 diagnostics.push(
                     Diagnostic::new(JavaLangImport, import.range)
-                        .with_fix(self.create_delete_fix(import, source))
+                        .with_fix(self.create_delete_fix(import, source)),
                 );
                 continue;
             }
 
             // Check for same-package import
-            if let Some(ref pkg) = current_package {
-                if self.is_same_package_import(import, pkg) {
-                    diagnostics.push(
-                        Diagnostic::new(SamePackageImport, import.range)
-                            .with_fix(self.create_delete_fix(import, source))
-                    );
-                }
+            if let Some(ref pkg) = current_package
+                && self.is_same_package_import(import, pkg)
+            {
+                diagnostics.push(
+                    Diagnostic::new(SamePackageImport, import.range)
+                        .with_fix(self.create_delete_fix(import, source)),
+                );
             }
         }
 
@@ -131,8 +131,7 @@ impl RedundantImport {
             return false;
         }
 
-        import.path.starts_with("java.lang.")
-            || import.path == "java.lang.*"
+        import.path.starts_with("java.lang.") || import.path == "java.lang.*"
     }
 
     fn is_same_package_import(&self, import: &ImportInfo, current_package: &str) -> bool {
@@ -219,7 +218,10 @@ import static java.lang.Math.PI;
 class Test {}
 "#;
         let diagnostics = check_source(source);
-        assert!(diagnostics.is_empty(), "Static java.lang imports should be allowed");
+        assert!(
+            diagnostics.is_empty(),
+            "Static java.lang imports should be allowed"
+        );
     }
 
     #[test]
@@ -259,7 +261,10 @@ import com.example.sub.Other;
 class Test {}
 "#;
         let diagnostics = check_source(source);
-        assert!(diagnostics.is_empty(), "Subpackage imports should be allowed");
+        assert!(
+            diagnostics.is_empty(),
+            "Subpackage imports should be allowed"
+        );
     }
 
     #[test]

@@ -360,6 +360,7 @@ dependencies = [
  "lintal_source_file",
  "lintal_text_size",
  "regex",
+ "tree-sitter",
 ]
 
 [[package]]

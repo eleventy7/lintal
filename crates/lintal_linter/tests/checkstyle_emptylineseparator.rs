@@ -2,13 +2,13 @@
 
 mod checkstyle_repo;
 
-use std::collections::HashSet;
 use lintal_java_cst::TreeWalker;
 use lintal_java_parser::JavaParser;
-use lintal_linter::rules::whitespace::empty_line_separator::EmptyLineSeparatorToken;
 use lintal_linter::rules::EmptyLineSeparator;
+use lintal_linter::rules::whitespace::empty_line_separator::EmptyLineSeparatorToken;
 use lintal_linter::{CheckContext, Rule};
 use lintal_source_file::{LineIndex, SourceCode};
+use std::collections::HashSet;
 
 /// A violation at a specific location.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,10 +177,7 @@ class Test {
     let violations = check_empty_line_separator(source);
     print_violations("Actual violations", &violations);
 
-    assert!(
-        !violations.is_empty(),
-        "constructor should need blank line"
-    );
+    assert!(!violations.is_empty(), "constructor should need blank line");
     assert!(
         violations.iter().any(|v| v.message.contains("CTOR_DEF")),
         "should have CTOR_DEF violation"
@@ -203,9 +200,7 @@ class Test {
     print_violations("Actual violations", &violations);
 
     assert!(
-        violations
-            .iter()
-            .any(|v| v.message.contains("STATIC_INIT")),
+        violations.iter().any(|v| v.message.contains("STATIC_INIT")),
         "static init should need blank line"
     );
 }
@@ -420,19 +415,25 @@ fn test_checkstyle_fixture_basic() {
 
     // Line 34: VARIABLE_DEF should be separated from previous line
     assert!(
-        violations.iter().any(|v| v.line == 34 && v.message.contains("VARIABLE_DEF")),
+        violations
+            .iter()
+            .any(|v| v.line == 34 && v.message.contains("VARIABLE_DEF")),
         "Should detect VARIABLE_DEF violation at line 34"
     );
 
     // Line 35: STATIC_INIT should be separated from previous line
     assert!(
-        violations.iter().any(|v| v.line == 35 && v.message.contains("STATIC_INIT")),
+        violations
+            .iter()
+            .any(|v| v.line == 35 && v.message.contains("STATIC_INIT")),
         "Should detect STATIC_INIT violation at line 35"
     );
 
     // Line 39: INSTANCE_INIT should be separated from previous line
     assert!(
-        violations.iter().any(|v| v.line == 39 && v.message.contains("INSTANCE_INIT")),
+        violations
+            .iter()
+            .any(|v| v.line == 39 && v.message.contains("INSTANCE_INIT")),
         "Should detect INSTANCE_INIT violation at line 39"
     );
 
@@ -460,8 +461,14 @@ fn test_checkstyle_fixture_allow_fields() {
     // With allowNoEmptyLineBetweenFields=true, field-to-field should not violate
     // but other member types should still require separation
     assert!(
-        violations.iter().all(|v| !v.message.contains("VARIABLE_DEF")
-            || violations.iter().filter(|v2| v2.line == v.line && v2.message.contains("VARIABLE_DEF")).count() == 0),
+        violations
+            .iter()
+            .all(|v| !v.message.contains("VARIABLE_DEF")
+                || violations
+                    .iter()
+                    .filter(|v2| v2.line == v.line && v2.message.contains("VARIABLE_DEF"))
+                    .count()
+                    == 0),
         "Should not report field-to-field violations when allowNoEmptyLineBetweenFields=true"
     );
 

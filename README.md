@@ -90,9 +90,9 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-lintal currently implements 28 checkstyle rules with 100% compatibility against checkstyle's own test suite.
+lintal currently implements 29 checkstyle rules with 100% compatibility against checkstyle's own test suite.
 
-### Whitespace (11 rules)
+### Whitespace (12 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
@@ -107,6 +107,7 @@ lintal currently implements 28 checkstyle rules with 100% compatibility against 
 | EmptyForInitializerPad | ✅ | 100% compatible |
 | FileTabCharacter | ✅ | 100% compatible |
 | OperatorWrap | ❌ | 100% compatible |
+| EmptyLineSeparator | ❌ | 100% compatible |
 
 ### Blocks (6 rules)
 

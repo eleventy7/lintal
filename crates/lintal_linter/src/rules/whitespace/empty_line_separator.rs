@@ -210,25 +210,24 @@ impl Rule for EmptyLineSeparator {
             let token_type = self.node_to_token(child.kind());
 
             // Skip if this token type is not being checked
+            // IMPORTANT: Don't track unchecked tokens as "previous" elements
+            // Checkstyle only requires blank lines after elements that are IN the tokens set
             if let Some(token) = token_type
                 && !self.tokens.contains(&token)
             {
-                // Still track it for prev_end_line
-                prev_end_line = Some(child.end_position().row);
-                prev_was_field = token == EmptyLineSeparatorToken::VariableDef;
+                // Don't update prev_end_line - unchecked tokens don't require separation
                 continue;
             }
 
             // Check if blank line is needed
             if let Some(prev_line) = prev_end_line {
-                let current_start_line = self.find_start_line_before_comments(&children, child);
-                let empty_lines = current_start_line.saturating_sub(prev_line + 1);
-
                 // Check for field-to-field transition
                 let is_field = token_type == Some(EmptyLineSeparatorToken::VariableDef);
                 let field_to_field = prev_was_field && is_field;
 
-                if empty_lines == 0 {
+                let has_blank = self.has_blank_line_before(&children, child, prev_line);
+
+                if !has_blank {
                     // Skip violation if field-to-field and allowed
                     if field_to_field && self.allow_no_empty_line_between_fields {
                         // OK, no violation
@@ -242,17 +241,21 @@ impl Rule for EmptyLineSeparator {
                             lintal_text_size::TextRange::new(start, end),
                         ));
                     }
-                } else if empty_lines > 1 && !self.allow_multiple_empty_lines
+                } else if !self.allow_multiple_empty_lines
                     && let Some(token) = token_type
                 {
-                    let start = lintal_text_size::TextSize::from(child.start_byte() as u32);
-                    let end = lintal_text_size::TextSize::from(child.start_byte() as u32 + 1);
-                    diagnostics.push(Diagnostic::new(
-                        TooManyEmptyLines {
-                            element: token.to_checkstyle_name().to_string(),
-                        },
-                        lintal_text_size::TextRange::new(start, end),
-                    ));
+                    // Check for multiple empty lines
+                    let empty_lines = self.count_empty_lines_before(&children, child, prev_line);
+                    if empty_lines > 1 {
+                        let start = lintal_text_size::TextSize::from(child.start_byte() as u32);
+                        let end = lintal_text_size::TextSize::from(child.start_byte() as u32 + 1);
+                        diagnostics.push(Diagnostic::new(
+                            TooManyEmptyLines {
+                                element: token.to_checkstyle_name().to_string(),
+                            },
+                            lintal_text_size::TextRange::new(start, end),
+                        ));
+                    }
                 }
             }
 
@@ -283,28 +286,102 @@ impl EmptyLineSeparator {
         }
     }
 
-    fn find_start_line_before_comments(
+    /// Check if there's at least one blank line between prev_end_line and the target
+    /// (including the region occupied by comments before the target).
+    ///
+    /// Checkstyle considers a blank line ANYWHERE in the comment block before an element
+    /// to satisfy the separation requirement.
+    fn has_blank_line_before(
         &self,
         children: &[tree_sitter::Node],
         target: &tree_sitter::Node,
-    ) -> usize {
-        // Find comments immediately before this node
+        prev_end_line: usize,
+    ) -> bool {
         let target_idx = children.iter().position(|c| c.id() == target.id());
 
         if let Some(idx) = target_idx {
-            // Walk backwards to find first comment in sequence before target
-            let mut first_comment_line = target.start_position().row;
+            // Collect all rows occupied by comments between prev element and target
+            let mut comment_rows = std::collections::HashSet::new();
             for i in (0..idx).rev() {
-                let prev = &children[i];
-                if prev.kind() == "line_comment" || prev.kind() == "block_comment" {
-                    first_comment_line = prev.start_position().row;
-                } else if prev.kind() != "{" && prev.kind() != "}" && !prev.is_extra() {
-                    break;
+                let child = &children[i];
+                if child.kind() == "{" || child.kind() == "}" {
+                    continue;
+                }
+                if child.kind() != "line_comment" && child.kind() != "block_comment" {
+                    if !child.is_extra() {
+                        break;
+                    }
+                    continue;
+                }
+                // Skip trailing comments on same line as prev element
+                if child.start_position().row == prev_end_line {
+                    continue;
+                }
+                // Add all rows this comment occupies
+                for row in child.start_position().row..=child.end_position().row {
+                    comment_rows.insert(row);
                 }
             }
-            first_comment_line
+
+            // Check each row between prev_end_line and target.start_position()
+            let target_start = target.start_position().row;
+            for row in (prev_end_line + 1)..target_start {
+                if !comment_rows.contains(&row) {
+                    // This row is not a comment, so it must be blank
+                    return true;
+                }
+            }
+
+            false
         } else {
-            target.start_position().row
+            false
+        }
+    }
+
+    /// Count the number of empty lines between prev_end_line and the target.
+    fn count_empty_lines_before(
+        &self,
+        children: &[tree_sitter::Node],
+        target: &tree_sitter::Node,
+        prev_end_line: usize,
+    ) -> usize {
+        let target_idx = children.iter().position(|c| c.id() == target.id());
+
+        if let Some(idx) = target_idx {
+            // Collect comment rows
+            let mut comment_rows = std::collections::HashSet::new();
+            for i in (0..idx).rev() {
+                let child = &children[i];
+                if child.kind() == "{" || child.kind() == "}" {
+                    continue;
+                }
+                if child.kind() != "line_comment" && child.kind() != "block_comment" {
+                    if !child.is_extra() {
+                        break;
+                    }
+                    continue;
+                }
+                // Skip trailing comments on same line as prev element
+                if child.start_position().row == prev_end_line {
+                    continue;
+                }
+                // Add all rows this comment occupies
+                for row in child.start_position().row..=child.end_position().row {
+                    comment_rows.insert(row);
+                }
+            }
+
+            // Count blank rows (rows not occupied by comments)
+            let target_start = target.start_position().row;
+            let mut count = 0;
+            for row in (prev_end_line + 1)..target_start {
+                if !comment_rows.contains(&row) {
+                    count += 1;
+                }
+            }
+            count
+        } else {
+            0
         }
     }
 }
@@ -468,5 +545,147 @@ class Test {
             diagnostics.is_empty(),
             "first member should not need blank line"
         );
+    }
+
+    #[test]
+    fn test_javadoc_before_method_ok() {
+        let source = r#"
+class Test {
+    void method1() {}
+
+    /**
+     * Javadoc comment
+     */
+    void method2() {}
+}
+"#;
+        let diagnostics = check_source(source);
+        assert!(
+            diagnostics.is_empty(),
+            "blank line before javadoc should satisfy requirement"
+        );
+    }
+
+    #[test]
+    fn test_agrona_like_structure() {
+        // Mimics the UnsafeBufferPosition.java structure
+        let source = r#"
+class Test {
+    private int x;
+
+    @SuppressWarnings("unused")
+    private int y;
+
+    /**
+     * Doc
+     */
+    public Test() {}
+}
+"#;
+        let diagnostics = check_source(source);
+        println!("\nDiagnostics:");
+        for d in &diagnostics {
+            println!("  {:?}", d);
+        }
+        assert!(
+            diagnostics.is_empty(),
+            "should have no violations - there are blank lines before all members"
+        );
+    }
+
+    #[test]
+    #[ignore] // Only run manually to debug
+    fn test_actual_agrona_file() {
+        test_real_file(
+            "/Users/shaunlaurens/src/lintal/target/agrona/agrona/src/main/java/org/agrona/concurrent/status/UnsafeBufferPosition.java",
+        );
+    }
+
+    #[test]
+    #[ignore] // Only run manually to debug
+    fn test_aeron_counter_file() {
+        test_real_file(
+            "/Users/shaunlaurens/src/lintal/target/aeron/aeron-client/src/main/java/io/aeron/Counter.java",
+        );
+    }
+
+    fn test_real_file(path: &str) {
+        use std::collections::HashSet;
+
+        let path = path;
+        let source = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(_) => {
+                println!("File not found, skipping");
+                return;
+            }
+        };
+
+        use lintal_java_parser::JavaParser;
+        let mut parser = JavaParser::new();
+        let result = parser.parse(&source).unwrap();
+        let root = result.tree.root_node();
+
+        fn find_class_bodies<'a>(
+            node: tree_sitter::Node<'a>,
+            bodies: &mut Vec<tree_sitter::Node<'a>>,
+        ) {
+            if node.kind() == "class_body" {
+                bodies.push(node);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                find_class_bodies(child, bodies);
+            }
+        }
+
+        let mut bodies = vec![];
+        find_class_bodies(root, &mut bodies);
+
+        for class_body in bodies {
+            println!("\nClass body @ row {}:", class_body.start_position().row);
+            let mut cursor = class_body.walk();
+            let children: Vec<_> = class_body.children(&mut cursor).collect();
+
+            for (i, child) in children.iter().enumerate() {
+                println!(
+                    "  [{}] {} @ row {}-{} extra={}",
+                    i,
+                    child.kind(),
+                    child.start_position().row,
+                    child.end_position().row,
+                    child.is_extra()
+                );
+            }
+        }
+
+        // Now check with actual rule
+        let ctx = CheckContext::new(&source);
+        let mut tokens = HashSet::new();
+        tokens.insert(EmptyLineSeparatorToken::MethodDef);
+        tokens.insert(EmptyLineSeparatorToken::CtorDef);
+        tokens.insert(EmptyLineSeparatorToken::ClassDef);
+        tokens.insert(EmptyLineSeparatorToken::InterfaceDef);
+        tokens.insert(EmptyLineSeparatorToken::EnumDef);
+        tokens.insert(EmptyLineSeparatorToken::StaticInit);
+        tokens.insert(EmptyLineSeparatorToken::InstanceInit);
+        tokens.insert(EmptyLineSeparatorToken::Import);
+
+        let rule = EmptyLineSeparator {
+            allow_no_empty_line_between_fields: true,
+            tokens,
+            ..Default::default()
+        };
+
+        let mut diagnostics = vec![];
+        for node in TreeWalker::new(result.tree.root_node(), &source) {
+            diagnostics.extend(rule.check(&ctx, &node));
+        }
+
+        println!("\nDiagnostics:");
+        for d in &diagnostics {
+            let line = ctx.source_code().line_column(d.range.start()).line.get();
+            println!("  Line {}: {}", line, d.kind.body);
+        }
     }
 }

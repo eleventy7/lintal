@@ -26,7 +26,7 @@ Since introducing lintal, we're spending less time on the checkstyle step—givi
 
 lintal is significantly faster than checkstyle due to native compilation and parallel processing (along with the Ruff heritage).
 
-**Benchmark vs Checkstyle 12.3.0** (same files, 21 of 26 supported rules, 10 runs each after warmup):
+**Benchmark vs Checkstyle 12.3.0** (same files, 21 of 27 supported rules, 10 runs each after warmup):
 
 | Repository | Files | Checkstyle | lintal | Speedup |
 |------------|-------|------------|--------|---------|
@@ -90,9 +90,9 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-lintal currently implements 26 checkstyle rules with 100% compatibility against checkstyle's own test suite.
+lintal currently implements 27 checkstyle rules with 100% compatibility against checkstyle's own test suite.
 
-### Whitespace (10 rules)
+### Whitespace (11 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
@@ -106,6 +106,7 @@ lintal currently implements 26 checkstyle rules with 100% compatibility against 
 | MethodParamPad | ✅ | 100% compatible |
 | EmptyForInitializerPad | ✅ | 100% compatible |
 | FileTabCharacter | ✅ | 100% compatible |
+| OperatorWrap | ❌ | 100% compatible |
 
 ### Blocks (6 rules)
 

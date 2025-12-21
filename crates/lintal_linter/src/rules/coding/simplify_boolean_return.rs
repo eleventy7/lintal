@@ -59,19 +59,22 @@ impl Rule for SimplifyBooleanReturn {
             return vec![];
         };
 
-        // Get the actual else block (might be wrapped in else clause)
-        let else_block = if alternative.kind() == "block" {
+        // Get the actual else body (might be a block or a bare statement)
+        let else_body = if alternative.kind() == "return_statement" {
+            // Bare return statement without braces
+            alternative
+        } else if alternative.kind() == "block" {
             alternative
         } else {
-            // It's an else clause, get its block child
+            // It's an else clause, get its body child (block or statement)
             let mut cursor = alternative.walk();
             alternative.children(&mut cursor)
-                .find(|c| c.kind() == "block")
+                .find(|c| c.kind() == "block" || c.kind() == "return_statement")
                 .unwrap_or(alternative)
         };
 
         // Check if alternative returns a boolean literal
-        let Some(else_literal) = Self::get_single_boolean_return(&else_block) else {
+        let Some(else_literal) = Self::get_single_boolean_return(&else_body) else {
             return vec![];
         };
 
@@ -89,11 +92,25 @@ impl Rule for SimplifyBooleanReturn {
 }
 
 impl SimplifyBooleanReturn {
-    /// Check if a block contains only a single return statement with a boolean literal.
+    /// Check if a block or statement is a single return statement with a boolean literal.
     /// Returns Some(true) for `return true`, Some(false) for `return false`, None otherwise.
-    fn get_single_boolean_return(block: &tree_sitter::Node) -> Option<bool> {
-        let mut cursor = block.walk();
-        let children: Vec<_> = block.children(&mut cursor)
+    fn get_single_boolean_return(node: &tree_sitter::Node) -> Option<bool> {
+        // Handle bare return statement
+        if node.kind() == "return_statement" {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                match child.kind() {
+                    "true" => return Some(true),
+                    "false" => return Some(false),
+                    _ => continue,
+                }
+            }
+            return None;
+        }
+
+        // Handle block with return statement
+        let mut cursor = node.walk();
+        let children: Vec<_> = node.children(&mut cursor)
             .filter(|c| !c.is_extra() && c.kind() != "{" && c.kind() != "}")
             .collect();
 
@@ -218,5 +235,21 @@ class Test {
 "#;
         let diagnostics = check_source(source);
         assert!(diagnostics.is_empty(), "Simple return should not be violation");
+    }
+
+    #[test]
+    fn test_bare_return_statements_violation() {
+        let source = r#"
+class Test {
+    boolean method(boolean cond) {
+        if (!cond)
+            return true;
+        else
+            return false;
+    }
+}
+"#;
+        let diagnostics = check_source(source);
+        assert_eq!(diagnostics.len(), 1, "Bare return statements should be violation");
     }
 }

@@ -53,8 +53,8 @@ impl RuleRegistry {
             FileTabCharacter, FinalLocalVariable, FinalParameters, LeftCurly, MethodParamPad,
             ModifierOrder, MultipleVariableDeclarations, NeedBraces, NoWhitespaceAfter,
             NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, ParenPad, RedundantImport,
-            RedundantModifier, RightCurly, SingleSpaceSeparator, TypecastParenPad, UnusedImports,
-            UpperEll, WhitespaceAfter, WhitespaceAround,
+            RedundantModifier, RightCurly, SimplifyBooleanReturn, SingleSpaceSeparator,
+            TypecastParenPad, UnusedImports, UpperEll, WhitespaceAfter, WhitespaceAround,
         };
         // Whitespace rules
         self.register::<WhitespaceAround>();
@@ -89,6 +89,7 @@ impl RuleRegistry {
         // Coding rules
         self.register::<OneStatementPerLine>();
         self.register::<MultipleVariableDeclarations>();
+        self.register::<SimplifyBooleanReturn>();
     }
 
     /// Create a rule from a module name and properties.

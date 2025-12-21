@@ -1,6 +1,7 @@
 //! Lint rules organized by category.
 
 pub mod blocks;
+pub mod coding;
 pub mod imports;
 pub mod modifier;
 pub mod style;

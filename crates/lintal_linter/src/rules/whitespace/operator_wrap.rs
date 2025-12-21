@@ -93,19 +93,38 @@ impl Rule for OperatorWrap {
 
         // Get the operator (middle child)
         let mut cursor = ts_node.walk();
-        let children: Vec<_> = ts_node.children(&mut cursor).collect();
+        let all_children: Vec<_> = ts_node.children(&mut cursor).collect();
+
+        // Filter out comments and whitespace (extra nodes)
+        let children: Vec<_> = all_children.iter()
+            .filter(|n| !n.is_extra())
+            .collect();
 
         if children.len() < 3 {
             return vec![];
         }
 
-        let left = &children[0];
-        let operator = &children[1];
-        let right = &children[2];
+        let left = children[0];
+        let operator = children[1];
+        let right = children[2];
 
         // Check if expression spans multiple lines
         let left_end = lintal_text_size::TextSize::from(left.end_byte() as u32);
-        let right_start = lintal_text_size::TextSize::from(right.start_byte() as u32);
+
+        // Skip comments to find the actual start of the right operand
+        let actual_right_start = {
+            let mut right_cursor = right.walk();
+            let first_non_extra = right.children(&mut right_cursor)
+                .find(|child| !child.is_extra());
+
+            if let Some(child) = first_non_extra {
+                child.start_byte()
+            } else {
+                right.start_byte()
+            }
+        };
+
+        let right_start = lintal_text_size::TextSize::from(actual_right_start as u32);
         let op_start = lintal_text_size::TextSize::from(operator.start_byte() as u32);
 
         let left_end_line = source_code.line_column(left_end).line.get();

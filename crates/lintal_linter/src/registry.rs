@@ -52,9 +52,9 @@ impl RuleRegistry {
             ArrayTypeStyle, AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
             FileTabCharacter, FinalLocalVariable, FinalParameters, LeftCurly, MethodParamPad,
             ModifierOrder, MultipleVariableDeclarations, NeedBraces, NoWhitespaceAfter,
-            NoWhitespaceBefore, OneStatementPerLine, ParenPad, RedundantImport, RedundantModifier,
-            RightCurly, SingleSpaceSeparator, TypecastParenPad, UnusedImports, UpperEll,
-            WhitespaceAfter, WhitespaceAround,
+            NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, ParenPad, RedundantImport,
+            RedundantModifier, RightCurly, SingleSpaceSeparator, TypecastParenPad, UnusedImports,
+            UpperEll, WhitespaceAfter, WhitespaceAround,
         };
         // Whitespace rules
         self.register::<WhitespaceAround>();
@@ -67,6 +67,7 @@ impl RuleRegistry {
         self.register::<EmptyForInitializerPad>();
         self.register::<TypecastParenPad>();
         self.register::<FileTabCharacter>();
+        self.register::<OperatorWrap>();
         // Block rules
         self.register::<LeftCurly>();
         self.register::<RightCurly>();

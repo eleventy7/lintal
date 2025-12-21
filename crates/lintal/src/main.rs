@@ -57,6 +57,11 @@ enum Commands {
         /// Path to checkstyle.xml config
         #[arg(short, long)]
         config: Option<PathBuf>,
+
+        /// Directory for resolving ${config_loc} in suppressions.xml paths
+        /// (defaults to the directory containing checkstyle.xml)
+        #[arg(long)]
+        config_loc: Option<PathBuf>,
     },
     /// Fix violations in files
     Fix {
@@ -67,6 +72,11 @@ enum Commands {
         /// Path to checkstyle.xml config
         #[arg(short, long)]
         config: Option<PathBuf>,
+
+        /// Directory for resolving ${config_loc} in suppressions.xml paths
+        /// (defaults to the directory containing checkstyle.xml)
+        #[arg(long)]
+        config_loc: Option<PathBuf>,
 
         /// Show diff without applying fixes
         #[arg(long)]
@@ -82,21 +92,36 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Check { paths, config } => run_check(&paths, config.as_deref()),
+        Commands::Check {
+            paths,
+            config,
+            config_loc,
+        } => run_check(&paths, config.as_deref(), config_loc.as_deref()),
         Commands::Fix {
             paths,
             config,
+            config_loc,
             diff,
             r#unsafe: allow_unsafe,
-        } => run_fix(&paths, config.as_deref(), diff, allow_unsafe),
+        } => run_fix(
+            &paths,
+            config.as_deref(),
+            config_loc.as_deref(),
+            diff,
+            allow_unsafe,
+        ),
     }
 }
 
 /// Run the check command.
-fn run_check(paths: &[PathBuf], config_path: Option<&Path>) -> Result<()> {
+fn run_check(
+    paths: &[PathBuf],
+    config_path: Option<&Path>,
+    config_loc: Option<&Path>,
+) -> Result<()> {
     // Load configuration
     let (rules, merged_config, suppression_filters, file_suppressions) =
-        load_rules(config_path, paths)?;
+        load_rules(config_path, config_loc, paths)?;
 
     if rules.is_empty() {
         eprintln!("{}", "Warning: No rules configured".yellow());
@@ -165,11 +190,12 @@ fn run_check(paths: &[PathBuf], config_path: Option<&Path>) -> Result<()> {
 fn run_fix(
     paths: &[PathBuf],
     config_path: Option<&Path>,
+    config_loc: Option<&Path>,
     diff_only: bool,
     allow_unsafe: bool,
 ) -> Result<()> {
     let (rules, merged_config, suppression_filters, file_suppressions) =
-        load_rules(config_path, paths)?;
+        load_rules(config_path, config_loc, paths)?;
 
     if rules.is_empty() {
         eprintln!("{}", "Warning: No rules configured".yellow());
@@ -525,6 +551,7 @@ fn format_diff(path: &Path, original: &str, fixed: &str) -> String {
 #[allow(clippy::type_complexity)]
 fn load_rules(
     config_path: Option<&Path>,
+    config_loc: Option<&Path>,
     base_paths: &[PathBuf],
 ) -> Result<(
     Vec<Box<dyn Rule>>,
@@ -536,7 +563,7 @@ fn load_rules(
 
     // Try to load configuration
     let (merged_config, suppression_filters, file_suppressions) =
-        load_config(config_path, base_paths)?;
+        load_config(config_path, config_loc, base_paths)?;
 
     let rules: Vec<Box<dyn Rule>> = match &merged_config {
         Some(config) => {
@@ -562,6 +589,7 @@ fn load_rules(
 /// Load merged configuration from files.
 fn load_config(
     config_path: Option<&Path>,
+    config_loc: Option<&Path>,
     base_paths: &[PathBuf],
 ) -> Result<(
     Option<MergedConfig>,
@@ -598,7 +626,8 @@ fn load_config(
     let suppression_filters = extract_suppression_filters(&checkstyle);
 
     // Extract file-based suppressions
-    let file_suppressions = extract_file_suppressions(&checkstyle, &checkstyle_path);
+    // Use config_loc if provided, otherwise use the directory containing checkstyle.xml
+    let file_suppressions = extract_file_suppressions(&checkstyle, &checkstyle_path, config_loc);
 
     Ok((
         Some(MergedConfig::new(&checkstyle, lintal.as_ref())),
@@ -631,17 +660,24 @@ fn extract_suppression_filters(config: &CheckstyleConfig) -> Vec<PlainTextCommen
 fn extract_file_suppressions(
     config: &CheckstyleConfig,
     checkstyle_path: &Path,
+    config_loc: Option<&Path>,
 ) -> FileSuppressionsConfig {
     // Look for SuppressionFilter module
     for module in &config.modules {
         if module.name == "SuppressionFilter"
             && let Some(file_prop) = module.property("file")
         {
-            // Resolve ${config_loc} to the directory containing checkstyle.xml
-            let config_dir = checkstyle_path
-                .parent()
+            // Resolve ${config_loc}:
+            // - If --config-loc was provided, use that directory
+            // - Otherwise, use the directory containing checkstyle.xml
+            let config_dir = config_loc
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| ".".to_string());
+                .unwrap_or_else(|| {
+                    checkstyle_path
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| ".".to_string())
+                });
 
             let resolved_path = file_prop.replace("${config_loc}", &config_dir);
             let suppressions_path = Path::new(&resolved_path);

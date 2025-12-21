@@ -73,7 +73,7 @@ def run_checkstyle(repo_path: Path, config_path: Path, file_list: Path, suppress
     return time.perf_counter() - start
 
 
-def run_lintal(repo_path: Path, config_path: Path) -> float:
+def run_lintal(repo_path: Path, config_path: Path, suppressions_dir: Path) -> float:
     """Run lintal and return elapsed time in seconds."""
     cmd = [
         str(LINTAL_BIN),
@@ -81,6 +81,8 @@ def run_lintal(repo_path: Path, config_path: Path) -> float:
         str(repo_path),
         "--config",
         str(config_path),
+        "--config-loc",
+        str(suppressions_dir),
     ]
     start = time.perf_counter()
     subprocess.run(cmd, capture_output=True, check=False)
@@ -88,9 +90,13 @@ def run_lintal(repo_path: Path, config_path: Path) -> float:
 
 
 def create_file_list(repo_path: Path) -> Path:
-    """Create a temp file with list of Java files."""
+    """Create a temp file with list of Java files (excluding build/generated)."""
     file_list = PROJECT_ROOT / "target" / f"{repo_path.name}_files.txt"
-    java_files = sorted(repo_path.rglob("*.java"))
+    # Exclude build directories which contain generated code
+    java_files = sorted(
+        f for f in repo_path.rglob("*.java")
+        if "/build/" not in str(f) and "/target/" not in str(f)
+    )
     file_list.write_text("\n".join(str(f) for f in java_files))
     return file_list
 
@@ -124,7 +130,7 @@ def benchmark_repo(name: str, repo_rel_path: str, benchmark_config: str) -> Benc
 
     for i in range(WARMUP_RUNS):
         print(f"  lintal warmup {i+1}...", end=" ", flush=True)
-        t = run_lintal(repo_path, config_path)
+        t = run_lintal(repo_path, config_path, suppressions_dir)
         print(f"{t:.2f}s")
 
     # Timed runs
@@ -139,7 +145,7 @@ def benchmark_repo(name: str, repo_rel_path: str, benchmark_config: str) -> Benc
     lintal_times = []
     for i in range(TIMED_RUNS):
         print(f"  lintal run {i+1}...", end=" ", flush=True)
-        t = run_lintal(repo_path, config_path)
+        t = run_lintal(repo_path, config_path, suppressions_dir)
         lintal_times.append(t)
         print(f"{t:.2f}s")
 

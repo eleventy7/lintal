@@ -16,7 +16,7 @@ lintal is tested against real-world projects including [Aeron](https://github.co
 
 lintal is significantly faster than checkstyle due to native compilation and parallel processing.
 
-**Benchmark vs Checkstyle 12.3.0** (same files, same 21 rules, 10 runs each after warmup):
+**Benchmark vs Checkstyle 12.3.0** (same files, 21 of 24 supported rules, 10 runs each after warmup):
 
 | Repository | Files | Checkstyle | lintal | Speedup |
 |------------|-------|------------|--------|---------|

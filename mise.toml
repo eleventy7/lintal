@@ -48,3 +48,22 @@ mkdir -p target
 description = "Run performance benchmark comparing lintal vs checkstyle"
 depends = ["build", "clone-test-repos", "download-checkstyle"]
 run = "uv run python scripts/benchmark.py"
+
+[tasks.release]
+description = "Tag and push a release (usage: mise run release 0.1.1)"
+run = """
+#!/bin/bash
+set -e
+VERSION="${1:?Usage: mise run release <version>}"
+echo "Building release to verify..."
+cargo build --release
+echo "Committing any pending changes..."
+git add -A && git commit -m "Release v$VERSION" --allow-empty
+echo "Tagging v$VERSION..."
+git tag "v$VERSION"
+echo "Pushing to remote..."
+git push && git push --tags
+echo ""
+echo "Release v$VERSION pushed!"
+echo "Watch the build: https://github.com/eleventy7/lintal/actions"
+"""

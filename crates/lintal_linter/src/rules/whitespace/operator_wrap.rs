@@ -4,7 +4,7 @@
 //!
 //! Checkstyle equivalent: OperatorWrapCheck
 
-use lintal_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use lintal_diagnostics::{Diagnostic, FixAvailability, Violation};
 use lintal_java_cst::CstNode;
 
 use crate::{CheckContext, FromConfig, Properties, Rule};
@@ -82,8 +82,68 @@ impl Rule for OperatorWrap {
         "OperatorWrap"
     }
 
-    fn check(&self, _ctx: &CheckContext, _node: &CstNode) -> Vec<Diagnostic> {
-        // TODO: Implement
+    fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        // Check binary expressions
+        if node.kind() != "binary_expression" {
+            return vec![];
+        }
+
+        let ts_node = node.inner();
+        let source_code = ctx.source_code();
+
+        // Get the operator (middle child)
+        let mut cursor = ts_node.walk();
+        let children: Vec<_> = ts_node.children(&mut cursor).collect();
+
+        if children.len() < 3 {
+            return vec![];
+        }
+
+        let left = &children[0];
+        let operator = &children[1];
+        let right = &children[2];
+
+        // Check if expression spans multiple lines
+        let left_end = lintal_text_size::TextSize::from(left.end_byte() as u32);
+        let right_start = lintal_text_size::TextSize::from(right.start_byte() as u32);
+        let op_start = lintal_text_size::TextSize::from(operator.start_byte() as u32);
+
+        let left_end_line = source_code.line_column(left_end).line.get();
+        let right_start_line = source_code.line_column(right_start).line.get();
+        let op_line = source_code.line_column(op_start).line.get();
+
+        // Only check if expression spans multiple lines
+        if left_end_line == right_start_line {
+            return vec![];
+        }
+
+        let op_text = operator.utf8_text(ctx.source().as_bytes()).unwrap_or("");
+        let op_range = lintal_text_size::TextRange::new(
+            op_start,
+            lintal_text_size::TextSize::from(operator.end_byte() as u32),
+        );
+
+        match self.option {
+            WrapOption::Nl => {
+                // Operator should be on new line (same line as right operand)
+                if op_line == left_end_line && op_line != right_start_line {
+                    return vec![Diagnostic::new(
+                        OperatorShouldBeOnNewLine { operator: op_text.to_string() },
+                        op_range,
+                    )];
+                }
+            }
+            WrapOption::Eol => {
+                // Operator should be at end of line (same line as left operand)
+                if op_line == right_start_line && op_line != left_end_line {
+                    return vec![Diagnostic::new(
+                        OperatorShouldBeOnPrevLine { operator: op_text.to_string() },
+                        op_range,
+                    )];
+                }
+            }
+        }
+
         vec![]
     }
 }

@@ -178,9 +178,134 @@ impl Rule for EmptyLineSeparator {
         "EmptyLineSeparator"
     }
 
-    fn check(&self, _ctx: &CheckContext, _node: &CstNode) -> Vec<Diagnostic> {
-        // TODO: Implement
-        vec![]
+    fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        let kind = node.kind();
+
+        // Only process container bodies
+        if kind != "class_body" && kind != "interface_body" && kind != "enum_body" {
+            return vec![];
+        }
+
+        let ts_node = node.inner();
+        let mut diagnostics = vec![];
+
+        let mut cursor = ts_node.walk();
+        let children: Vec<_> = ts_node.children(&mut cursor).collect();
+
+        // Track previous non-comment element
+        let mut prev_end_line: Option<usize> = None;
+        let mut prev_was_field = false;
+
+        for child in &children {
+            // Skip braces and extra nodes
+            if child.kind() == "{" || child.kind() == "}" || child.is_extra() {
+                continue;
+            }
+
+            // Comments don't count as "previous" - they attach to next element
+            if child.kind() == "line_comment" || child.kind() == "block_comment" {
+                continue;
+            }
+
+            let token_type = self.node_to_token(child.kind());
+
+            // Skip if this token type is not being checked
+            if let Some(token) = token_type
+                && !self.tokens.contains(&token)
+            {
+                // Still track it for prev_end_line
+                prev_end_line = Some(child.end_position().row);
+                prev_was_field = token == EmptyLineSeparatorToken::VariableDef;
+                continue;
+            }
+
+            // Check if blank line is needed
+            if let Some(prev_line) = prev_end_line {
+                let current_start_line = self.find_start_line_before_comments(&children, child);
+                let empty_lines = current_start_line.saturating_sub(prev_line + 1);
+
+                // Check for field-to-field transition
+                let is_field = token_type == Some(EmptyLineSeparatorToken::VariableDef);
+                let field_to_field = prev_was_field && is_field;
+
+                if empty_lines == 0 {
+                    // Skip violation if field-to-field and allowed
+                    if field_to_field && self.allow_no_empty_line_between_fields {
+                        // OK, no violation
+                    } else if let Some(token) = token_type {
+                        let start = lintal_text_size::TextSize::from(child.start_byte() as u32);
+                        let end = lintal_text_size::TextSize::from(child.start_byte() as u32 + 1);
+                        diagnostics.push(Diagnostic::new(
+                            ShouldBeSeparated {
+                                element: token.to_checkstyle_name().to_string(),
+                            },
+                            lintal_text_size::TextRange::new(start, end),
+                        ));
+                    }
+                } else if empty_lines > 1 && !self.allow_multiple_empty_lines
+                    && let Some(token) = token_type
+                {
+                    let start = lintal_text_size::TextSize::from(child.start_byte() as u32);
+                    let end = lintal_text_size::TextSize::from(child.start_byte() as u32 + 1);
+                    diagnostics.push(Diagnostic::new(
+                        TooManyEmptyLines {
+                            element: token.to_checkstyle_name().to_string(),
+                        },
+                        lintal_text_size::TextRange::new(start, end),
+                    ));
+                }
+            }
+
+            prev_end_line = Some(child.end_position().row);
+            prev_was_field = token_type == Some(EmptyLineSeparatorToken::VariableDef);
+        }
+
+        diagnostics
+    }
+}
+
+impl EmptyLineSeparator {
+    fn node_to_token(&self, kind: &str) -> Option<EmptyLineSeparatorToken> {
+        match kind {
+            "package_declaration" => Some(EmptyLineSeparatorToken::PackageDef),
+            "import_declaration" => Some(EmptyLineSeparatorToken::Import),
+            "class_declaration" => Some(EmptyLineSeparatorToken::ClassDef),
+            "interface_declaration" => Some(EmptyLineSeparatorToken::InterfaceDef),
+            "enum_declaration" => Some(EmptyLineSeparatorToken::EnumDef),
+            "static_initializer" => Some(EmptyLineSeparatorToken::StaticInit),
+            "block" => Some(EmptyLineSeparatorToken::InstanceInit), // instance init block
+            "method_declaration" => Some(EmptyLineSeparatorToken::MethodDef),
+            "constructor_declaration" => Some(EmptyLineSeparatorToken::CtorDef),
+            "field_declaration" => Some(EmptyLineSeparatorToken::VariableDef),
+            "record_declaration" => Some(EmptyLineSeparatorToken::RecordDef),
+            "compact_constructor_declaration" => Some(EmptyLineSeparatorToken::CompactCtorDef),
+            _ => None,
+        }
+    }
+
+    fn find_start_line_before_comments(
+        &self,
+        children: &[tree_sitter::Node],
+        target: &tree_sitter::Node,
+    ) -> usize {
+        // Find comments immediately before this node
+        let target_idx = children.iter().position(|c| c.id() == target.id());
+
+        if let Some(idx) = target_idx {
+            // Walk backwards to find first comment in sequence before target
+            let mut first_comment_line = target.start_position().row;
+            for i in (0..idx).rev() {
+                let prev = &children[i];
+                if prev.kind() == "line_comment" || prev.kind() == "block_comment" {
+                    first_comment_line = prev.start_position().row;
+                } else if prev.kind() != "{" && prev.kind() != "}" && !prev.is_extra() {
+                    break;
+                }
+            }
+            first_comment_line
+        } else {
+            target.start_position().row
+        }
     }
 }
 

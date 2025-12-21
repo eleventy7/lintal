@@ -51,9 +51,9 @@ impl RuleRegistry {
         use crate::rules::{
             ArrayTypeStyle, AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
             FileTabCharacter, FinalLocalVariable, FinalParameters, LeftCurly, MethodParamPad,
-            ModifierOrder, NeedBraces, NoWhitespaceAfter, NoWhitespaceBefore, ParenPad,
-            RedundantImport, RedundantModifier, RightCurly, SingleSpaceSeparator, TypecastParenPad,
-            UnusedImports, UpperEll, WhitespaceAfter, WhitespaceAround,
+            ModifierOrder, NeedBraces, NoWhitespaceAfter, NoWhitespaceBefore, OneStatementPerLine,
+            ParenPad, RedundantImport, RedundantModifier, RightCurly, SingleSpaceSeparator,
+            TypecastParenPad, UnusedImports, UpperEll, WhitespaceAfter, WhitespaceAround,
         };
         // Whitespace rules
         self.register::<WhitespaceAround>();
@@ -84,6 +84,8 @@ impl RuleRegistry {
         // Import rules
         self.register::<RedundantImport>();
         self.register::<UnusedImports>();
+        // Coding rules
+        self.register::<OneStatementPerLine>();
     }
 
     /// Create a rule from a module name and properties.

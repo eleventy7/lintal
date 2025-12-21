@@ -11,6 +11,7 @@ pub mod whitespace;
 pub use blocks::{
     AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, LeftCurly, NeedBraces, RightCurly,
 };
+pub use coding::OneStatementPerLine;
 pub use imports::{RedundantImport, UnusedImports};
 pub use modifier::{FinalLocalVariable, FinalParameters, ModifierOrder, RedundantModifier};
 pub use style::{ArrayTypeStyle, UpperEll};

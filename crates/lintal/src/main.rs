@@ -13,9 +13,15 @@ use lintal_linter::{
 };
 use lintal_text_size::Ranged;
 use rayon::prelude::*;
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use walkdir::WalkDir;
+
+// Thread-local parser to avoid repeated initialization overhead
+thread_local! {
+    static PARSER: RefCell<JavaParser> = RefCell::new(JavaParser::new());
+}
 
 /// Result of checking a single file.
 struct FileCheckResult {
@@ -264,8 +270,9 @@ fn fix_file(
     let source = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
-    let mut parser = JavaParser::new();
-    let Some(result) = parser.parse(&source) else {
+    // Use thread-local parser to avoid repeated initialization
+    let parse_result = PARSER.with(|parser| parser.borrow_mut().parse(&source));
+    let Some(result) = parse_result else {
         return Ok(FileFixResult {
             fixed: 0,
             unfixable: 0,
@@ -769,8 +776,9 @@ fn check_file(
     let source = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
-    let mut parser = JavaParser::new();
-    let Some(result) = parser.parse(&source) else {
+    // Use thread-local parser to avoid repeated initialization
+    let parse_result = PARSER.with(|parser| parser.borrow_mut().parse(&source));
+    let Some(result) = parse_result else {
         return Ok(FileCheckResult {
             violations: vec![format!("{}: Failed to parse", path.display())],
             violation_count: 0,

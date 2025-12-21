@@ -16,3 +16,4 @@ Thumbs.db
 *.so
 *.dylib
 *.dll
+.history/

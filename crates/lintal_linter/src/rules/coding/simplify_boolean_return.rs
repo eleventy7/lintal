@@ -38,9 +38,86 @@ impl Rule for SimplifyBooleanReturn {
         "SimplifyBooleanReturn"
     }
 
-    fn check(&self, _ctx: &CheckContext, _node: &CstNode) -> Vec<Diagnostic> {
-        // TODO: Implement
+    fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {
+        if node.kind() != "if_statement" {
+            return vec![];
+        }
+
+        let ts_node = node.inner();
+
+        // Must have an else clause
+        let Some(alternative) = ts_node.child_by_field_name("alternative") else {
+            return vec![];
+        };
+
+        let Some(consequence) = ts_node.child_by_field_name("consequence") else {
+            return vec![];
+        };
+
+        // Check if consequence returns a boolean literal
+        let Some(then_literal) = Self::get_single_boolean_return(&consequence) else {
+            return vec![];
+        };
+
+        // Get the actual else block (might be wrapped in else clause)
+        let else_block = if alternative.kind() == "block" {
+            alternative
+        } else {
+            // It's an else clause, get its block child
+            let mut cursor = alternative.walk();
+            alternative.children(&mut cursor)
+                .find(|c| c.kind() == "block")
+                .unwrap_or(alternative)
+        };
+
+        // Check if alternative returns a boolean literal
+        let Some(else_literal) = Self::get_single_boolean_return(&else_block) else {
+            return vec![];
+        };
+
+        // Both return boolean literals - this is a violation
+        if (then_literal && !else_literal) || (!then_literal && else_literal) {
+            let range = lintal_text_size::TextRange::new(
+                lintal_text_size::TextSize::from(ts_node.start_byte() as u32),
+                lintal_text_size::TextSize::from(ts_node.end_byte() as u32),
+            );
+            return vec![Diagnostic::new(SimplifyBooleanReturnViolation, range)];
+        }
+
         vec![]
+    }
+}
+
+impl SimplifyBooleanReturn {
+    /// Check if a block contains only a single return statement with a boolean literal.
+    /// Returns Some(true) for `return true`, Some(false) for `return false`, None otherwise.
+    fn get_single_boolean_return(block: &tree_sitter::Node) -> Option<bool> {
+        let mut cursor = block.walk();
+        let children: Vec<_> = block.children(&mut cursor)
+            .filter(|c| !c.is_extra() && c.kind() != "{" && c.kind() != "}")
+            .collect();
+
+        // Must have exactly one statement
+        if children.len() != 1 {
+            return None;
+        }
+
+        let stmt = &children[0];
+        if stmt.kind() != "return_statement" {
+            return None;
+        }
+
+        // Get the return value
+        let mut stmt_cursor = stmt.walk();
+        for child in stmt.children(&mut stmt_cursor) {
+            match child.kind() {
+                "true" => return Some(true),
+                "false" => return Some(false),
+                _ => continue,
+            }
+        }
+
+        None
     }
 }
 

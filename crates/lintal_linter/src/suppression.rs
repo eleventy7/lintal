@@ -678,4 +678,175 @@ class Foo {
             "FinalParameters should be suppressed without checkstyle: prefix"
         );
     }
+
+    // Tests for FileSuppressionsConfig (suppressions.xml parsing)
+
+    #[test]
+    fn test_file_suppressions_from_xml_basic() {
+        let xml = r#"<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Puppy Crawl//DTD Suppressions 1.0//EN"
+    "https://checkstyle.org/dtds/suppressions_1_0.dtd">
+<suppressions>
+    <suppress files=".*generated-src.*" checks="."/>
+    <suppress files=".*generated-test.*" checks="."/>
+</suppressions>
+"#;
+
+        let config = FileSuppressionsConfig::from_xml(xml);
+        assert_eq!(config.len(), 2);
+        assert!(!config.is_empty());
+    }
+
+    #[test]
+    fn test_file_suppressions_matches_generated_files() {
+        let xml = r#"<suppressions>
+    <suppress files=".*generated-src.*" checks="."/>
+</suppressions>"#;
+
+        let config = FileSuppressionsConfig::from_xml(xml);
+
+        // Should suppress all rules for generated files
+        assert!(config.is_suppressed(
+            "some/path/generated-src/Foo.java",
+            "FinalLocalVariable"
+        ));
+        assert!(config.is_suppressed(
+            "some/path/generated-src/Bar.java",
+            "ModifierOrder"
+        ));
+
+        // Should not suppress regular files
+        assert!(!config.is_suppressed("src/main/java/Foo.java", "FinalLocalVariable"));
+    }
+
+    #[test]
+    fn test_file_suppressions_specific_check() {
+        let xml = r#"<suppressions>
+    <suppress files="[\\/]test[\\/]" checks="MissingJavadoc.*"/>
+</suppressions>"#;
+
+        let config = FileSuppressionsConfig::from_xml(xml);
+
+        // Should suppress MissingJavadocMethod for test files
+        assert!(config.is_suppressed(
+            "src/test/java/FooTest.java",
+            "MissingJavadocMethod"
+        ));
+        assert!(config.is_suppressed("src/test/java/BarTest.java", "MissingJavadocType"));
+
+        // Should NOT suppress other rules for test files
+        assert!(!config.is_suppressed(
+            "src/test/java/FooTest.java",
+            "FinalLocalVariable"
+        ));
+
+        // Should NOT suppress anything for main files
+        assert!(!config.is_suppressed(
+            "src/main/java/Foo.java",
+            "MissingJavadocMethod"
+        ));
+    }
+
+    #[test]
+    fn test_file_suppressions_is_file_fully_suppressed() {
+        let xml = r#"<suppressions>
+    <suppress files=".*generated.*" checks="."/>
+    <suppress files="[\\/]test[\\/]" checks="MissingJavadoc.*"/>
+</suppressions>"#;
+
+        let config = FileSuppressionsConfig::from_xml(xml);
+
+        // Generated files are fully suppressed (checks=".")
+        assert!(config.is_file_fully_suppressed("path/generated/Foo.java"));
+
+        // Test files are NOT fully suppressed (only MissingJavadoc.*)
+        assert!(!config.is_file_fully_suppressed("src/test/java/FooTest.java"));
+
+        // Main files are not suppressed at all
+        assert!(!config.is_file_fully_suppressed("src/main/java/Foo.java"));
+    }
+
+    #[test]
+    fn test_file_suppressions_aeron_style() {
+        // Aeron's actual suppressions.xml format
+        let xml = r#"<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Puppy Crawl//DTD Suppressions 1.0//EN"
+    "https://checkstyle.org/dtds/suppressions_1_0.dtd">
+<suppressions>
+    <suppress files=".*generated-src.*" checks="."/>
+    <suppress files=".*generated-test.*" checks="."/>
+    <suppress files="[\\/]test[\\/]" checks="MissingJavadoc.*"/>
+    <suppress files="[\\/]test[\\/]" checks="JavadocVariable"/>
+    <suppress files=".*package-info.java" checks="LineLength"/>
+</suppressions>"#;
+
+        let config = FileSuppressionsConfig::from_xml(xml);
+        assert_eq!(config.len(), 5);
+
+        // Test generated-src suppression
+        assert!(config.is_file_fully_suppressed(
+            "aeron-cluster/build/generated-src/io/aeron/cluster/codecs/Foo.java"
+        ));
+
+        // Test generated-test suppression
+        assert!(config.is_file_fully_suppressed(
+            "aeron-cluster/build/generated-test/io/aeron/cluster/codecs/Bar.java"
+        ));
+
+        // Test MissingJavadoc suppression for test files
+        assert!(config.is_suppressed(
+            "aeron-client/src/test/java/FooTest.java",
+            "MissingJavadocMethod"
+        ));
+
+        // Test JavadocVariable suppression for test files
+        assert!(config.is_suppressed(
+            "aeron-client/src/test/java/BarTest.java",
+            "JavadocVariable"
+        ));
+
+        // Test package-info LineLength suppression
+        assert!(config.is_suppressed(
+            "aeron-client/src/main/java/io/aeron/package-info.java",
+            "LineLength"
+        ));
+
+        // Main files should not be suppressed for random rules
+        assert!(!config.is_suppressed(
+            "aeron-client/src/main/java/Foo.java",
+            "FinalLocalVariable"
+        ));
+    }
+
+    #[test]
+    fn test_file_suppression_rule_new() {
+        // Valid patterns
+        let rule = FileSuppressionRule::new(".*Test\\.java$", "FinalLocalVariable");
+        assert!(rule.is_some());
+
+        // Invalid regex should return None
+        let bad_rule = FileSuppressionRule::new("[invalid(", "SomeRule");
+        assert!(bad_rule.is_none());
+    }
+
+    #[test]
+    fn test_file_suppression_empty_xml() {
+        let xml = "";
+        let config = FileSuppressionsConfig::from_xml(xml);
+        assert!(config.is_empty());
+        assert_eq!(config.len(), 0);
+    }
+
+    #[test]
+    fn test_file_suppression_no_suppress_elements() {
+        let xml = r#"<?xml version="1.0"?>
+<suppressions>
+    <!-- No suppress elements -->
+</suppressions>"#;
+
+        let config = FileSuppressionsConfig::from_xml(xml);
+        assert!(config.is_empty());
+    }
 }

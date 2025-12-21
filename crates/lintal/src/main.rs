@@ -316,15 +316,16 @@ fn fix_file(
 
     let path_str = path.to_string_lossy();
 
+    // Cache which rules are suppressed for this file (check once, not per-node)
+    let unsuppressed_rules: Vec<_> = rules
+        .iter()
+        .filter(|rule| !file_suppressions.is_suppressed(&path_str, rule.name()))
+        .collect();
+
     // Collect all diagnostics, filtering out suppressed ones
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
     for node in TreeWalker::new(root.inner(), &source) {
-        for rule in rules {
-            // Skip if this rule is suppressed for this file
-            if file_suppressions.is_suppressed(&path_str, rule.name()) {
-                continue;
-            }
-
+        for rule in &unsuppressed_rules {
             for diagnostic in rule.check(&ctx, &node) {
                 if !suppression_ctx.is_suppressed(rule.name(), diagnostic.range.start()) {
                     diagnostics.push(diagnostic);
@@ -835,13 +836,14 @@ fn check_file(
 
     let path_str = path.to_string_lossy();
 
-    for node in TreeWalker::new(root.inner(), &source) {
-        for rule in rules {
-            // Skip if this rule is suppressed for this file by file-based suppressions
-            if file_suppressions.is_suppressed(&path_str, rule.name()) {
-                continue;
-            }
+    // Cache which rules are suppressed for this file (check once, not per-node)
+    let unsuppressed_rules: Vec<_> = rules
+        .iter()
+        .filter(|rule| !file_suppressions.is_suppressed(&path_str, rule.name()))
+        .collect();
 
+    for node in TreeWalker::new(root.inner(), &source) {
+        for rule in &unsuppressed_rules {
             let diagnostics = rule.check(&ctx, &node);
             for diagnostic in diagnostics {
                 // Skip suppressed diagnostics (comment-based and @SuppressWarnings)

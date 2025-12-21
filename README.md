@@ -26,13 +26,13 @@ Since introducing lintal, we're spending less time on the checkstyle step—givi
 
 lintal is significantly faster than checkstyle due to native compilation and parallel processing (along with the Ruff heritage).
 
-**Benchmark vs Checkstyle 12.3.0** (same files, 21 of 27 supported rules, 10 runs each after warmup):
+**Benchmark vs Checkstyle 12.3.0** (same files, 23 of 29 supported rules, 10 runs each after warmup):
 
 | Repository | Files | Checkstyle | lintal | Speedup |
 |------------|-------|------------|--------|---------|
-| Agrona | 289 | 1.73s ± 0.01s | 0.20s ± 0.01s | **8.8x** |
-| Artio | 726 | 2.94s ± 0.02s | 0.41s ± 0.03s | **7.2x** |
-| Aeron | 934 | 5.30s ± 0.02s | 0.91s ± 0.13s | **5.8x** |
+| Agrona | 289 | 1.49s ± 0.02s | 0.32s ± 0.02s | **4.7x** |
+| Artio | 726 | 2.55s ± 0.03s | 0.65s ± 0.02s | **3.9x** |
+| Aeron | 929 | 4.76s ± 0.08s | 1.54s ± 0.11s | **3.1x** |
 
 ![Benchmark Results](docs/benchmark_results.png)
 
@@ -62,7 +62,7 @@ lintal supports macOS and Linux. Windows support is a non-goal.
 
 | Distribution   | Status  | Command                                          |
 |----------------|---------|--------------------------------------------------|
-| GitHub Release | [v0.1.1](https://github.com/eleventy7/lintal/releases/tag/v0.1.1) | Direct download |
+| GitHub Release | [v0.1.2](https://github.com/eleventy7/lintal/releases/tag/v0.1.2) | Direct download |
 | Homebrew       | Working | `brew tap eleventy7/lintal && brew install lintal` |
 | mise ubi       | Ready   | `mise use ubi:eleventy7/lintal`                  |
 

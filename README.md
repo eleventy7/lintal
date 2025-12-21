@@ -90,7 +90,7 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-lintal currently implements 27 checkstyle rules with 100% compatibility against checkstyle's own test suite.
+lintal currently implements 28 checkstyle rules with 100% compatibility against checkstyle's own test suite.
 
 ### Whitespace (11 rules)
 
@@ -142,12 +142,13 @@ lintal currently implements 27 checkstyle rules with 100% compatibility against 
 | UnusedImports | ✅ | 100% compatible |
 | RedundantImport | ✅ | 100% compatible |
 
-### Coding (2 rules)
+### Coding (3 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
 | OneStatementPerLine | ✅ | 100% compatible |
 | MultipleVariableDeclarations | ✅ (partial) | 100% compatible |
+| SimplifyBooleanReturn | ❌ | 100% compatible |
 
 ## Development
 

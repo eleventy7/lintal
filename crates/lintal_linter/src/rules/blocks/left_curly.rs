@@ -861,9 +861,7 @@ mod tests {
         };
         let diagnostics = check_source_with_config(source, &rule);
         // Should find a violation for the constructor's `{` (skip class brace at low offset)
-        let ctor_diagnostic = diagnostics
-            .iter()
-            .find(|d| d.range.start().to_u32() > 15);
+        let ctor_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
         assert!(
             ctor_diagnostic.is_some(),
             "Expected violation for constructor brace"
@@ -884,9 +882,7 @@ mod tests {
             ..Default::default()
         };
         let diagnostics = check_source_with_config(source, &rule);
-        let ctor_diagnostic = diagnostics
-            .iter()
-            .find(|d| d.range.start().to_u32() > 15);
+        let ctor_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
         assert!(
             ctor_diagnostic.is_some(),
             "Expected violation for constructor brace"
@@ -907,9 +903,7 @@ mod tests {
             ..Default::default()
         };
         let diagnostics = check_source_with_config(source, &rule);
-        let method_diagnostic = diagnostics
-            .iter()
-            .find(|d| d.range.start().to_u32() > 15);
+        let method_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
         assert!(
             method_diagnostic.is_some(),
             "Expected violation for method brace"
@@ -930,9 +924,7 @@ mod tests {
             ..Default::default()
         };
         let diagnostics = check_source_with_config(source, &rule);
-        let method_diagnostic = diagnostics
-            .iter()
-            .find(|d| d.range.start().to_u32() > 15);
+        let method_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
         assert!(
             method_diagnostic.is_some(),
             "Expected violation for method brace with comment"
@@ -953,9 +945,7 @@ mod tests {
             ..Default::default()
         };
         let diagnostics = check_source_with_config(source, &rule);
-        let method_diagnostic = diagnostics
-            .iter()
-            .find(|d| d.range.start().to_u32() > 15);
+        let method_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
         assert!(
             method_diagnostic.is_some(),
             "Expected violation for method brace with block comment"

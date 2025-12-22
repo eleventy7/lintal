@@ -36,7 +36,7 @@ struct BraceLineInfo {
     line_end: TextSize,
     line_end_exclusive: TextSize,
     brace_offset: usize,
-    comment: Option<String>,
+    trailing_content: String,
     before_is_whitespace: bool,
 }
 
@@ -180,22 +180,26 @@ impl Rule for LeftCurly {
 }
 
 impl LeftCurly {
-    fn parse_trailing_comment(after: &str) -> Option<Option<String>> {
-        let trimmed = after.trim_start_matches([' ', '\t']);
+    /// Parse trailing content after the left curly brace.
+    /// Returns Some(content) if we can safely generate a fix, None if content is too complex.
+    ///
+    /// Note: We return None for patterns like `{ }` or `{  }` because:
+    /// 1. These patterns often have SingleSpaceSeparator violations too
+    /// 2. Our fix would conflict with SingleSpaceSeparator's fix
+    /// 3. The fixer currently doesn't properly skip ALL edits from a fix when one overlaps
+    fn parse_trailing_content(after: &str) -> Option<String> {
+        let trimmed = after.trim_end();
         if trimmed.is_empty() {
-            return Some(None);
+            return Some(String::new());
         }
-        if trimmed.starts_with("//") {
-            return Some(Some(trimmed.trim_end().to_string()));
-        }
-        if trimmed.starts_with("/*") {
-            if let Some(end) = trimmed.find("*/") {
-                let (comment, rest) = trimmed.split_at(end + 2);
-                if rest.trim().is_empty() {
-                    return Some(Some(comment.to_string()));
-                }
-            }
+        let content = trimmed.trim_start();
+        // Don't generate fix for `{ }` patterns to avoid fix conflicts
+        if content.starts_with('}') {
             return None;
+        }
+        // For comments, preserve them (with a leading space)
+        if content.starts_with("//") || content.starts_with("/*") {
+            return Some(format!(" {}", content));
         }
         None
     }
@@ -215,14 +219,14 @@ impl LeftCurly {
         let before = &line_text[..brace_offset];
         let before_is_whitespace = before.chars().all(|c| c.is_whitespace());
         let after = &line_text[brace_offset + 1..];
-        let comment = Self::parse_trailing_comment(after)?;
+        let trailing_content = Self::parse_trailing_content(after)?;
         Some(BraceLineInfo {
             line,
             line_start,
             line_end,
             line_end_exclusive,
             brace_offset,
-            comment,
+            trailing_content,
             before_is_whitespace,
         })
     }
@@ -259,10 +263,7 @@ impl LeftCurly {
             insertion.push(' ');
         }
         insertion.push('{');
-        if let Some(comment) = &info.comment {
-            insertion.push(' ');
-            insertion.push_str(comment);
-        }
+        insertion.push_str(&info.trailing_content);
         let delete = Edit::range_deletion(TextRange::new(info.line_start, info.line_end));
         let insert = Edit::insertion(insertion, prev_line_end_exclusive);
         Some(Fix::safe_edits(delete, [insert]))
@@ -293,10 +294,7 @@ impl LeftCurly {
         insertion.push('\n');
         insertion.push_str(&indent);
         insertion.push('{');
-        if let Some(comment) = &info.comment {
-            insertion.push(' ');
-            insertion.push_str(comment);
-        }
+        insertion.push_str(&info.trailing_content);
         let insert = Edit::insertion(insertion, info.line_end_exclusive);
         Some(Fix::safe_edits(delete, [insert]))
     }
@@ -847,5 +845,114 @@ mod tests {
         let fixed = apply_edits(source, fix.edits());
         let expected = "@Deprecated\npublic final class Foo { /* body */\n    void m() {}\n}\n";
         assert_eq!(fixed, expected);
+    }
+
+    // Tests for empty block patterns - these should NOT have fixes to avoid conflicts
+    // with SingleSpaceSeparator
+
+    #[test]
+    fn test_left_curly_nl_empty_block_no_fix() {
+        // For NL option, `{ }` pattern should report violation but NOT have a fix
+        // because fixing it would conflict with SingleSpaceSeparator fixes
+        let source = "class Foo\n{\n    private Foo() { }\n}\n";
+        let rule = LeftCurly {
+            option: LeftCurlyOption::Nl,
+            ..Default::default()
+        };
+        let diagnostics = check_source_with_config(source, &rule);
+        // Should find a violation for the constructor's `{` (skip class brace at low offset)
+        let ctor_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
+        assert!(
+            ctor_diagnostic.is_some(),
+            "Expected violation for constructor brace"
+        );
+        // The diagnostic should NOT have a fix (to avoid conflict with SingleSpaceSeparator)
+        assert!(
+            ctor_diagnostic.unwrap().fix.is_none(),
+            "Expected NO fix for empty block pattern to avoid conflicts"
+        );
+    }
+
+    #[test]
+    fn test_left_curly_nl_double_space_empty_block_no_fix() {
+        // For NL option, `{  }` (double space) pattern should report violation but NOT have a fix
+        let source = "class Foo\n{\n    private Foo() {  }\n}\n";
+        let rule = LeftCurly {
+            option: LeftCurlyOption::Nl,
+            ..Default::default()
+        };
+        let diagnostics = check_source_with_config(source, &rule);
+        let ctor_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
+        assert!(
+            ctor_diagnostic.is_some(),
+            "Expected violation for constructor brace"
+        );
+        assert!(
+            ctor_diagnostic.unwrap().fix.is_none(),
+            "Expected NO fix for double-space empty block pattern"
+        );
+    }
+
+    #[test]
+    fn test_left_curly_nl_with_statement_no_fix() {
+        // For NL option, `{ statement; }` should NOT have a fix
+        // (complex content after brace)
+        let source = "class Foo\n{\n    void m() { return; }\n}\n";
+        let rule = LeftCurly {
+            option: LeftCurlyOption::Nl,
+            ..Default::default()
+        };
+        let diagnostics = check_source_with_config(source, &rule);
+        let method_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
+        assert!(
+            method_diagnostic.is_some(),
+            "Expected violation for method brace"
+        );
+        // Non-empty blocks with statements also don't have fixes (complex content)
+        assert!(
+            method_diagnostic.unwrap().fix.is_none(),
+            "Expected NO fix for block with statement content"
+        );
+    }
+
+    #[test]
+    fn test_left_curly_nl_with_line_comment_has_fix() {
+        // For NL option, `{ // comment` should have a fix (comments can be preserved)
+        let source = "class Foo\n{\n    void m() { // todo\n        return;\n    }\n}\n";
+        let rule = LeftCurly {
+            option: LeftCurlyOption::Nl,
+            ..Default::default()
+        };
+        let diagnostics = check_source_with_config(source, &rule);
+        let method_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
+        assert!(
+            method_diagnostic.is_some(),
+            "Expected violation for method brace with comment"
+        );
+        // Comments CAN be preserved, so this should have a fix
+        assert!(
+            method_diagnostic.unwrap().fix.is_some(),
+            "Expected fix for brace followed by line comment"
+        );
+    }
+
+    #[test]
+    fn test_left_curly_nl_with_block_comment_has_fix() {
+        // For NL option, `{ /* comment */` should have a fix
+        let source = "class Foo\n{\n    void m() { /* start */\n        return;\n    }\n}\n";
+        let rule = LeftCurly {
+            option: LeftCurlyOption::Nl,
+            ..Default::default()
+        };
+        let diagnostics = check_source_with_config(source, &rule);
+        let method_diagnostic = diagnostics.iter().find(|d| d.range.start().to_u32() > 15);
+        assert!(
+            method_diagnostic.is_some(),
+            "Expected violation for method brace with block comment"
+        );
+        assert!(
+            method_diagnostic.unwrap().fix.is_some(),
+            "Expected fix for brace followed by block comment"
+        );
     }
 }

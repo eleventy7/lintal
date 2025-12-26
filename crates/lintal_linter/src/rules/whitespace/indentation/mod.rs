@@ -1147,7 +1147,22 @@ impl Indentation {
 
         let case_line = self.line_no(ctx, node);
         let continuation_indent = case_indent.with_offset(self.line_wrapping_indentation);
-        let body_indent = continuation_indent.with_offset(self.line_wrapping_indentation);
+
+        // Track if arrow is on continuation line - body will need extra indent
+        let arrow_on_continuation = node.children()
+            .find(|c| c.kind() == "->")
+            .map_or(false, |arrow| {
+                self.line_no(ctx, &arrow) > case_line && ctx.is_on_start_of_line(&arrow)
+            });
+
+        // Body indent depends on whether arrow is on continuation line
+        // - Arrow on continuation: body uses lineWrappingIndentation from arrow position
+        // - Arrow on same line: body uses basicOffset from case position (like block content)
+        let body_continuation_indent = if arrow_on_continuation {
+            continuation_indent.with_offset(self.line_wrapping_indentation)
+        } else {
+            case_indent.with_offset(self.basic_offset)
+        };
 
         // Check the children (switch_label and body)
         for child in node.children() {
@@ -1170,12 +1185,13 @@ impl Indentation {
                     self.check_block(ctx, &child, case_indent);
                 }
                 // Body expression on continuation line (not a block)
+                // Should be indented by lineWrappingIndentation from case or arrow
                 "expression_statement" | "throw_statement" => {
                     let child_line = self.line_no(ctx, &child);
                     if child_line > case_line && ctx.is_on_start_of_line(&child) {
                         let actual = ctx.get_line_start(child_line);
-                        if !ctx.is_indent_acceptable(actual, &body_indent) {
-                            ctx.log_child_error(&child, "lambda", actual, &body_indent);
+                        if !ctx.is_indent_acceptable(actual, &body_continuation_indent) {
+                            ctx.log_child_error(&child, "case", actual, &body_continuation_indent);
                         }
                     }
                 }
@@ -1789,6 +1805,18 @@ impl Indentation {
             let lparen_line = self.line_no(ctx, &args);
             let mut in_multiline_args = false;
 
+            // Check if this is a multiline argument list (closing ) on a different line)
+            // For multiline argument lists, nested expressions need accumulated indentation
+            let is_multiline_arglist = self.find_child(&args, ")")
+                .map_or(false, |rparen| self.line_no(ctx, &rparen) > lparen_line);
+
+            // For multiline argument lists, accumulate line wrapping for nested expressions
+            let nested_indent = if is_multiline_arglist {
+                indent.with_offset(self.line_wrapping_indentation)
+            } else {
+                chain_indent.clone()
+            };
+
             for child in args.children() {
                 match child.kind() {
                     // Skip punctuation and comments
@@ -1805,8 +1833,8 @@ impl Indentation {
                                 }
                             }
                         }
-                        // Check nested expressions in arguments with the argument indent
-                        self.check_expression(ctx, &child, &chain_indent);
+                        // Check nested expressions in arguments with the accumulated indent
+                        self.check_expression(ctx, &child, &nested_indent);
                     }
                 }
             }
@@ -1877,9 +1905,12 @@ impl Indentation {
                             // Use that line's indent as the base for the anonymous class body
                             IndentLevel::new(cont_indent)
                         } else {
-                            // First argument was on same line as `new`
-                            // Use the `new` expression's line start
-                            new_indent.clone()
+                            // Opening brace at end of line (e.g., new Runnable() {)
+                            // Body indent includes line wrapping from the enclosing context
+                            // Accept new position + lineWrapping, or accumulated indent + lineWrapping
+                            new_indent.with_offset(self.line_wrapping_indentation)
+                                .combine(&indent.with_offset(self.line_wrapping_indentation))
+                                .combine(&new_indent)
                         }
                     } else {
                         new_indent.clone()

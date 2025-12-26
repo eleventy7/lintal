@@ -1113,3 +1113,18 @@ fn test_fixture_compatibility_summary() {
     // This test always passes - it's for reporting
     assert!(files_tested > 0, "Should test at least one fixture");
 }
+
+#[test]
+fn test_debug_single_switch_without_curly() {
+    debug_fixture("InputIndentationCheckSingleSwitchStatementsWithoutCurly.java");
+}
+
+#[test]
+fn test_debug_lambda_child_same_line() {
+    debug_fixture("InputIndentationLambdaAndChildOnTheSameLine.java");
+}
+
+#[test]
+fn test_debug_strict_condition() {
+    debug_fixture("InputIndentationStrictCondition.java");
+}

@@ -127,6 +127,20 @@ impl<'a> HandlerContext<'a> {
         self.config.force_strict_condition
     }
 
+    /// Checks if the actual indent is acceptable given the expected indent level.
+    /// When force_strict_condition=false, accepts actual >= minimum expected.
+    /// Use this for line-wrapped content (method args, lambda bodies, etc.)
+    pub fn is_indent_acceptable(&self, actual: i32, expected: &super::super::IndentLevel) -> bool {
+        expected.is_acceptable_with_force_strict(actual, self.config.force_strict_condition)
+    }
+
+    /// Checks if the actual indent is exactly at an expected level.
+    /// Always uses strict checking regardless of forceStrictCondition.
+    /// Use this for structural indentation (block children, class members, etc.)
+    pub fn is_indent_exact(&self, actual: i32, expected: &super::super::IndentLevel) -> bool {
+        expected.is_acceptable(actual)
+    }
+
     /// Returns the tab width.
     pub fn tab_width(&self) -> usize {
         self.tab_width

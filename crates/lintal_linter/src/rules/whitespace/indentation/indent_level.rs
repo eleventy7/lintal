@@ -66,9 +66,20 @@ impl IndentLevel {
         self.levels.len() > 1
     }
 
-    /// Checks if given indentation is acceptable.
+    /// Checks if given indentation is acceptable (strict check - exact match).
     pub fn is_acceptable(&self, indent: i32) -> bool {
         self.levels.contains(&indent)
+    }
+
+    /// Checks if given indentation is acceptable with lenient checking.
+    /// When force_strict=false, accepts any indent >= minimum expected level.
+    pub fn is_acceptable_with_force_strict(&self, indent: i32, force_strict: bool) -> bool {
+        if force_strict {
+            self.levels.contains(&indent)
+        } else {
+            // Lenient mode: actual >= minimum expected is acceptable
+            self.levels.first().is_some_and(|&min| indent >= min)
+        }
     }
 
     /// Returns true if indent is less than the minimal acceptable level.

@@ -14,18 +14,46 @@ use std::collections::{HashMap, HashSet};
 
 /// Parse configuration from fixture file header comments.
 /// Format: ` * propertyName = value   //indent:...`
+/// Handles both `/* Config: ... */` blocks and Javadoc-style `/** ... */` blocks.
+/// If explicit config not found, infers from indent comments in code.
 fn parse_fixture_config(source: &str) -> HashMap<String, String> {
     let mut config = HashMap::new();
 
+    // First pass: look for explicit config in header comments
+    // Config can appear in:
+    // 1. /* Config: ... */ block
+    // 2. Javadoc /** ... */ block with "This test-input is intended..." text
+    let mut in_config_block = false;
+    let mut in_javadoc = false;
+
     for line in source.lines() {
-        // Stop at class/interface declaration
-        if line.contains("class ") || line.contains("interface ") || line.contains("enum ") {
-            break;
+        let line_trimmed = line.trim();
+
+        // Check for start of config block
+        if line_trimmed.contains("/* Config:") || line_trimmed.contains("/*Config:") {
+            in_config_block = true;
+            continue;
+        }
+
+        // Check for start of Javadoc block
+        if line_trimmed.starts_with("/**") {
+            in_javadoc = true;
+            continue;
+        }
+
+        // Check for end of comment block
+        if (in_config_block || in_javadoc) && line_trimmed.contains("*/") {
+            in_config_block = false;
+            in_javadoc = false;
+            continue;
+        }
+
+        if !in_config_block && !in_javadoc {
+            continue;
         }
 
         // Look for config lines like: " * basicOffset = 2"
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("*") {
+        if let Some(rest) = line_trimmed.strip_prefix("*") {
             let rest = rest.trim();
             // Skip empty lines and non-config lines
             if rest.is_empty() || rest.starts_with('@') || rest.starts_with("This") {
@@ -62,7 +90,77 @@ fn parse_fixture_config(source: &str) -> HashMap<String, String> {
         }
     }
 
+    // If no explicit config found, try to infer from code patterns
+    if config.is_empty() {
+        infer_config_from_code(source, &mut config);
+    }
+
     config
+}
+
+/// Infer configuration by analyzing indent comments in the code.
+/// Looks for the first class member after class declaration to determine basicOffset.
+fn infer_config_from_code(source: &str, config: &mut HashMap<String, String>) {
+    let mut in_class_body = false;
+    let mut class_indent = 0i32;
+
+    for line in source.lines() {
+        // Find class declaration and its indent
+        if !in_class_body && (line.contains("class ") || line.contains("interface ") || line.contains("enum ")) {
+            if let Some(comment_start) = line.find("//indent:") {
+                let comment = &line[comment_start..];
+                if let Some(indent) = comment[9..].split_whitespace().next().and_then(|s| s.parse::<i32>().ok()) {
+                    class_indent = indent;
+                    in_class_body = true;
+                }
+            }
+            continue;
+        }
+
+        // Find first class member to determine basicOffset
+        if in_class_body {
+            // Get the code part before any //indent comment
+            let code_part = if let Some(comment_start) = line.find("//indent:") {
+                line[..comment_start].trim()
+            } else {
+                line.trim()
+            };
+
+            // Skip braces, blank lines, and lines that are effectively empty
+            if code_part.is_empty() || code_part == "{" || code_part == "}" {
+                continue;
+            }
+
+            // Look for indent comment
+            if let Some(comment_start) = line.find("//indent:") {
+                let comment = &line[comment_start..];
+                if let Some(indent) = comment[9..].split_whitespace().next().and_then(|s| s.parse::<i32>().ok()) {
+                    // Sanity check: indent should be reasonable (< 20)
+                    if indent > 20 {
+                        continue;
+                    }
+
+                    // Found a class member with indent - calculate basicOffset
+                    let basic_offset = indent - class_indent;
+                    if basic_offset > 0 && basic_offset <= 8 {
+                        config.insert("basicOffset".to_string(), basic_offset.to_string());
+
+                        // Also infer lineWrappingIndentation from deeper nesting if available
+                        // For now, use same as basicOffset or double it based on patterns
+                        // Most common patterns: basicOffset=2 with lineWrap=4, or both=4
+                        if basic_offset == 2 {
+                            config.insert("lineWrappingIndentation".to_string(), "4".to_string());
+                            config.insert("tabWidth".to_string(), "2".to_string());
+                        } else {
+                            config.insert("lineWrappingIndentation".to_string(), basic_offset.to_string());
+                            config.insert("tabWidth".to_string(), basic_offset.to_string());
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
 }
 
 /// Run Indentation rule on source with given config and collect violation lines.
@@ -492,6 +590,53 @@ class Foo {
 }
 
 #[test]
+fn test_explicit_constructor_invocation() {
+    // Test super() and this() constructor calls
+    let source = r#"
+class Base {
+    Base(long arg) {}
+}
+class Invalid extends Base {
+    public Invalid(long arg) {
+    super(
+    arg
+    + 1L);
+    }
+}
+"#;
+    // Debug: print AST structure
+    let mut parser = JavaParser::new();
+    let result = parser.parse(source).unwrap();
+
+    fn print_tree(node: lintal_java_cst::CstNode, depth: usize) {
+        let indent = "  ".repeat(depth);
+        if node.kind().contains("constructor") || node.kind() == "super" || node.kind() == "this" || node.kind() == "block" {
+            eprintln!("{}{}", indent, node.kind());
+        }
+        for child in node.children() {
+            print_tree(child, depth + 1);
+        }
+    }
+
+    eprintln!("\n=== AST for constructor call test ===");
+    print_tree(lintal_java_cst::CstNode::new(result.tree.root_node(), source), 0);
+
+    // Now check with config
+    let mut props = std::collections::HashMap::new();
+    props.insert("basicOffset".to_string(), "4".to_string());
+    props.insert("lineWrappingIndentation".to_string(), "4".to_string());
+
+    let violations = check_indentation_with_config(source, &props);
+    eprintln!("Violations: {:?}", violations);
+
+    // super( at line 7 column 4 should be violation (expected 8)
+    // arg at line 8 column 4 should be violation
+    // + 1L at line 9 column 4 should be violation
+    assert!(violations.contains(&7) || violations.contains(&8),
+        "Expected violations for incorrectly indented super() call, got: {:?}", violations);
+}
+
+#[test]
 fn test_chained_method_calls_line_wrapped() {
     // Tests line-wrapped chained method calls
     let source = r#"
@@ -625,6 +770,99 @@ fn test_debug_valid_array_init() {
 #[test]
 fn test_debug_valid_switch() {
     debug_fixture("InputIndentationValidSwitchIndent.java");
+}
+
+#[test]
+fn test_debug_labels() {
+    debug_fixture("InputIndentationLabels.java");
+}
+
+#[test]
+fn test_debug_anonymous_classes() {
+    debug_fixture("InputIndentationAnonymousClasses.java");
+}
+
+#[test]
+fn test_debug_lambda1() {
+    debug_fixture("InputIndentationLambda1.java");
+}
+
+#[test]
+fn test_debug_try_resources() {
+    debug_fixture("InputIndentationTryResourcesNotStrict1.java");
+}
+
+#[test]
+fn test_debug_valid_assign() {
+    debug_fixture("InputIndentationValidAssignIndent.java");
+}
+
+#[test]
+fn test_debug_valid_if2() {
+    debug_fixture("InputIndentationValidIfIndent2.java");
+}
+
+#[test]
+fn test_debug_record_pattern() {
+    debug_fixture("InputIndentationRecordPattern.java");
+}
+
+#[test]
+fn test_debug_pattern_matching_switch() {
+    debug_fixture("InputIndentationPatternMatchingForSwitch.java");
+}
+
+#[test]
+fn test_debug_yield_statement() {
+    debug_fixture("InputIndentationYieldStatement.java");
+}
+
+#[test]
+fn test_debug_guava() {
+    debug_fixture("InputIndentationFromGuava.java");
+}
+
+#[test]
+fn test_debug_ctor_call() {
+    debug_fixture("InputIndentationCtorCall.java");
+}
+
+#[test]
+fn test_debug_throws_indent() {
+    debug_fixture("InputIndentationInvalidThrowsIndent2.java");
+}
+
+#[test]
+fn test_throws_clause_indentation() {
+    // Test throws clause on continuation line
+    let source = r#"
+class Foo {
+    void bar()
+        throws Exception {
+    }
+}
+"#;
+    let violations = check_indentation(source);
+    assert!(violations.is_empty(), "Expected no violations for correctly indented throws, got lines: {:?}", violations);
+}
+
+#[test]
+fn test_throws_clause_wrong_indentation() {
+    // Test throws clause with wrong indentation
+    let source = r#"
+class Foo {
+    void bar()
+throws Exception {
+    }
+}
+"#;
+    let violations = check_indentation(source);
+    assert!(violations.contains(&4), "Expected violation for incorrectly indented throws at line 4, got: {:?}", violations);
+}
+
+#[test]
+fn test_debug_classes_methods() {
+    debug_fixture("InputIndentationClassesMethods.java");
 }
 
 /// Test Valid* fixtures - these should have minimal/no violations

@@ -106,6 +106,7 @@ jobs:
           cargo test --package lintal_linter --test checkstyle_operatorwrap
           cargo test --package lintal_linter --test checkstyle_simplifybooleanreturn
           cargo test --package lintal_linter --test checkstyle_emptylineseparator
+          cargo test --package lintal_linter --test checkstyle_indentation
 
   # Real-world project tests (ensures lintal works on production codebases)
   real-world-tests:

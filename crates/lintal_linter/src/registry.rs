@@ -50,8 +50,8 @@ impl RuleRegistry {
     fn register_builtins(&mut self) {
         use crate::rules::{
             ArrayTypeStyle, AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
-            EmptyLineSeparator, FileTabCharacter, FinalLocalVariable, FinalParameters, LeftCurly,
-            MethodParamPad, ModifierOrder, MultipleVariableDeclarations, NeedBraces,
+            EmptyLineSeparator, FileTabCharacter, FinalLocalVariable, FinalParameters, Indentation,
+            LeftCurly, MethodParamPad, ModifierOrder, MultipleVariableDeclarations, NeedBraces,
             NoWhitespaceAfter, NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, ParenPad,
             RedundantImport, RedundantModifier, RightCurly, SimplifyBooleanReturn,
             SingleSpaceSeparator, TypecastParenPad, UnusedImports, UpperEll, WhitespaceAfter,
@@ -70,6 +70,7 @@ impl RuleRegistry {
         self.register::<FileTabCharacter>();
         self.register::<OperatorWrap>();
         self.register::<EmptyLineSeparator>();
+        self.register::<Indentation>();
         // Block rules
         self.register::<LeftCurly>();
         self.register::<RightCurly>();

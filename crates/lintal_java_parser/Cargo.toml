@@ -8,6 +8,10 @@ license = "MIT"
 [lib]
 doctest = false
 
+[[bin]]
+name = "dump_java_ast"
+path = "src/bin/dump_java_ast.rs"
+
 [dependencies]
 tree-sitter = "0.26"
 tree-sitter-java = "0.23"

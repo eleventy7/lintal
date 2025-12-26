@@ -88,3 +88,30 @@ lintal auto-discovers config from:
 1. `--config` flag
 2. `config/checkstyle/checkstyle.xml` relative to target directory
 3. `checkstyle.xml` in current directory
+
+## Development Tools
+
+### Dump Java AST
+
+To inspect the tree-sitter AST for a Java file (useful when implementing rules):
+
+```bash
+# Build the tool
+cargo build --bin dump_java_ast
+
+# Pipe a Java file to see its AST
+cat MyClass.java | ./target/debug/dump_java_ast
+
+# Or use stdin redirection
+./target/debug/dump_java_ast < MyClass.java
+
+# Example output:
+# program [1:0-6:0]
+#   class_declaration [1:0-5:1]
+#     class [1:0-1:5] "class"
+#     identifier [1:6-1:9] "Foo"
+#     class_body [1:10-5:1]
+#       ...
+```
+
+Output format: `node_kind [start_line:start_col-end_line:end_col] "text preview"`

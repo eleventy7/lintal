@@ -1209,3 +1209,13 @@ fn test_debug_members() {
 fn test_debug_multiline() {
     debug_fixture("InputIndentationMultilineStatements.java");
 }
+
+#[test]
+fn test_debug_invalid_switch() {
+    debug_fixture("InputIndentationInvalidSwitchIndent.java");
+}
+
+#[test]
+fn test_debug_invalid_for() {
+    debug_fixture("InputIndentationInvalidForIndent.java");
+}

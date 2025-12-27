@@ -648,15 +648,21 @@ impl Indentation {
         }
 
         // Determine child indent based on brace position:
-        // - If opening brace is on its own line, child indent is based on
-        //   ACTUAL brace position + basicOffset (checkstyle uses actual, not expected)
-        // - If opening brace is on same line as parent statement, child indent is
-        //   parent_indent + basicOffset
-        let child_indent = if let Some(lcurly) = lcurly {
-            if ctx.is_on_start_of_line(&lcurly) {
-                // Brace on its own line - use actual position + basicOffset
-                let brace_col = ctx.column_from_node(&lcurly);
-                IndentLevel::new(brace_col + self.basic_offset)
+        // - If opening brace is on its own line AND at correct position, child indent is
+        //   actual brace position + basicOffset
+        // - If opening brace is at wrong position or on same line, use parent_indent + basicOffset
+        //   (checkstyle uses expected parent, not wrong actual)
+        let child_indent = if let Some(lcurly) = &lcurly {
+            if ctx.is_on_start_of_line(lcurly) {
+                let brace_col = ctx.column_from_node(lcurly);
+                // Check if brace is at correct position
+                if ctx.is_indent_exact(brace_col, parent_indent) {
+                    // Brace at correct position - use actual position + basicOffset
+                    IndentLevel::new(brace_col + self.basic_offset)
+                } else {
+                    // Brace at wrong position - use expected parent + basicOffset
+                    parent_indent.with_offset(self.basic_offset)
+                }
             } else {
                 // Brace on same line - use parent + basicOffset
                 parent_indent.with_offset(self.basic_offset)
@@ -1238,12 +1244,12 @@ impl Indentation {
 
         // Determine base indent for switch body:
         // - If switch is at a valid position, use its actual position
-        // - If switch is at an invalid position, use the line-wrapped expected position
+        // - If switch is at an invalid position, use the expected statement position
         let body_base_indent = if switch_is_valid {
             IndentLevel::new(switch_actual)
         } else {
-            // Use expected line-wrapped position for consistency with checkstyle
-            line_wrapped_indent
+            // Use expected statement position for consistency with checkstyle
+            indent.clone()
         };
 
         // Check switch body/block
@@ -1697,17 +1703,76 @@ impl Indentation {
         let ctor_indent = IndentLevel::new(ctor_start);
 
         // For chained constructor calls (obj.super(...)), check object expression
+        // and check continuation lines (the `.` or `super` on separate lines)
         if let Some(obj) = node.child_by_field_name("object") {
             self.check_expression(ctx, &obj, indent);
+
+            let obj_line = self.line_no(ctx, &obj);
+            let obj_start = ctx.get_line_start(obj_line);
+            let continuation_indent = IndentLevel::new(obj_start)
+                .with_offset(self.line_wrapping_indentation);
+
+            // Check for `.` on a continuation line
+            if let Some(dot) = self.find_child(node, ".") {
+                let dot_line = self.line_no(ctx, &dot);
+                if dot_line > obj_line && ctx.is_on_start_of_line(&dot) {
+                    let actual = ctx.get_line_start(dot_line);
+                    if !ctx.is_indent_acceptable(actual, &continuation_indent) {
+                        ctx.log_child_error(&dot, "ctor call", actual, &continuation_indent);
+                    }
+                }
+            }
+
+            // Check for `super` keyword on a continuation line after object or dot
+            if let Some(super_kw) = self.find_child(node, "super") {
+                let super_line = self.line_no(ctx, &super_kw);
+                if super_line > obj_line && ctx.is_on_start_of_line(&super_kw) {
+                    let actual = ctx.get_line_start(super_line);
+                    if !ctx.is_indent_acceptable(actual, &continuation_indent) {
+                        ctx.log_child_error(&super_kw, "ctor call", actual, &continuation_indent);
+                    }
+                }
+            }
         }
 
         // Check arguments - they should be indented by lineWrappingIndentation
         if let Some(args) = node.child_by_field_name("arguments") {
             let arg_indent = ctor_indent.with_offset(self.line_wrapping_indentation);
             // Also accept parent-based indentation
-            let combined_arg_indent = arg_indent.combine(&indent.with_offset(self.line_wrapping_indentation));
+            let combined_arg_indent =
+                arg_indent.combine(&indent.with_offset(self.line_wrapping_indentation));
+
+            // Find the keyword line (super or this) - this is where the call starts
+            let keyword_line = if let Some(super_kw) = self.find_child(node, "super") {
+                self.line_no(ctx, &super_kw)
+            } else if let Some(this_kw) = self.find_child(node, "this") {
+                self.line_no(ctx, &this_kw)
+            } else {
+                ctor_line
+            };
+
+            // Check if argument list (lparen) is on a different line from the keyword
+            if let Some(lparen) = self.find_child(&args, "(") {
+                let lparen_line = self.line_no(ctx, &lparen);
+                if lparen_line > keyword_line && ctx.is_on_start_of_line(&lparen) {
+                    let actual = ctx.get_line_start(lparen_line);
+                    if !ctx.is_indent_acceptable(actual, &combined_arg_indent) {
+                        ctx.log_child_error(&lparen, "ctor call", actual, &arg_indent);
+                    }
+                }
+            }
 
             let lparen_line = self.line_no(ctx, &args);
+            // Get the actual lparen column for argument indentation base
+            let lparen_col = self
+                .find_child(&args, "(")
+                .map(|lp| ctx.column_from_node(&lp))
+                .unwrap_or_else(|| ctx.get_line_start(lparen_line));
+
+            // For arguments, expected indent is lparen column + basicOffset or lineWrappingIndentation
+            let lparen_arg_indent = IndentLevel::new(lparen_col + self.basic_offset)
+                .combine(&IndentLevel::new(lparen_col + self.line_wrapping_indentation));
+
             for child in args.children() {
                 match child.kind() {
                     // Skip punctuation and comments
@@ -1716,12 +1781,18 @@ impl Indentation {
                         let child_line = self.line_no(ctx, &child);
                         if child_line > lparen_line && ctx.is_on_start_of_line(&child) {
                             let actual = ctx.get_line_start(child_line);
-                            if !ctx.is_indent_acceptable(actual, &combined_arg_indent) {
-                                ctx.log_child_error(&child, "ctor call", actual, &arg_indent);
+                            // Use lparen-based indent for arguments on continuation lines
+                            if !ctx.is_indent_acceptable(actual, &lparen_arg_indent) {
+                                ctx.log_child_error(
+                                    &child,
+                                    "ctor call",
+                                    actual,
+                                    &IndentLevel::new(lparen_col + self.line_wrapping_indentation),
+                                );
                             }
                         }
-                        // Check nested expressions
-                        self.check_expression(ctx, &child, &ctor_indent);
+                        // Check nested expressions - use lparen-based indent for proper nesting
+                        self.check_expression(ctx, &child, &IndentLevel::new(lparen_col));
                     }
                 }
             }
@@ -1997,9 +2068,16 @@ impl Indentation {
         // Lambda indent based on actual position (for line wrapping)
         let lambda_indent = IndentLevel::new(lambda_start);
 
+        // Check if lambda itself is at wrong position
+        let lambda_at_wrong_pos = !ctx.is_indent_acceptable(lambda_start, indent);
+
         // The arrow should be at the same level as the lambda parameters
-        // (either the lambda's actual position, or the expected position from the parent)
-        let arrow_expected_indent = lambda_indent.combine(indent);
+        // With forceStrictCondition=true, only accept expected position
+        let arrow_expected_indent = if self.force_strict_condition {
+            indent.clone()
+        } else {
+            lambda_indent.combine(indent)
+        };
 
         // Check the arrow (->) if it's on a continuation line
         for child in node.children() {
@@ -2020,7 +2098,11 @@ impl Indentation {
 
             if body.kind() == "block" {
                 // Block body - determine the base indent for the block
-                let block_indent = if body_line > lambda_line {
+                // With forceStrictCondition=true, use expected indent, not actual position
+                let block_indent = if self.force_strict_condition && lambda_at_wrong_pos {
+                    // Lambda is at wrong position - use expected position for block indent
+                    indent.clone()
+                } else if body_line > lambda_line {
                     // Block starts on a new line - use lambda position
                     lambda_indent.combine(indent)
                 } else {
@@ -2029,15 +2111,24 @@ impl Indentation {
                     if let Some(lcurly) = self.find_child(&body, "{") {
                         if ctx.is_on_start_of_line(&lcurly) {
                             // Brace at start of line - use that position
-                            IndentLevel::new(ctx.column_from_node(&lcurly))
+                            let brace_col = ctx.column_from_node(&lcurly);
+                            if self.force_strict_condition {
+                                // With strict mode, only use expected position
+                                indent.clone()
+                            } else {
+                                IndentLevel::new(brace_col)
+                            }
                         } else {
                             // Brace at end of line (e.g., `r2r(() -> {`)
                             // Block content should be at parent indent + lineWrappingIndentation
-                            // to allow for alignment-based formatting
-                            indent
-                                .with_offset(self.line_wrapping_indentation)
-                                .combine(&lambda_indent)
-                                .combine(indent)
+                            if self.force_strict_condition {
+                                indent.clone()
+                            } else {
+                                indent
+                                    .with_offset(self.line_wrapping_indentation)
+                                    .combine(&lambda_indent)
+                                    .combine(indent)
+                            }
                         }
                     } else {
                         indent.clone()
@@ -2046,21 +2137,41 @@ impl Indentation {
                 self.check_block(ctx, &body, &block_indent);
             } else if ctx.is_on_start_of_line(&body) {
                 // Expression body on a new line - should be indented with line wrapping
-                let body_indent = lambda_indent.with_offset(self.line_wrapping_indentation);
+                // For forceStrictCondition, accept expected lambda position OR line wrapping from it
+                let body_indent = if self.force_strict_condition {
+                    // With strict mode, accept expected position + lineWrapping
+                    indent.with_offset(self.line_wrapping_indentation).combine(indent)
+                } else {
+                    lambda_indent.with_offset(self.line_wrapping_indentation)
+                };
                 // Also accept parent-based indentation
-                let combined = body_indent
-                    .combine(&indent.with_offset(self.line_wrapping_indentation))
-                    .combine(indent);
+                let combined = if self.force_strict_condition {
+                    body_indent.clone()
+                } else {
+                    body_indent
+                        .combine(&indent.with_offset(self.line_wrapping_indentation))
+                        .combine(indent)
+                };
 
                 let actual = ctx.get_line_start(body_line);
                 if !ctx.is_indent_acceptable(actual, &combined) {
                     ctx.log_child_error(&body, "lambda", actual, &body_indent);
                 }
                 // Check nested expressions in the body
-                self.check_expression(ctx, &body, &lambda_indent);
+                let expr_indent = if self.force_strict_condition {
+                    indent.clone()
+                } else {
+                    lambda_indent.clone()
+                };
+                self.check_expression(ctx, &body, &expr_indent);
             } else {
                 // Same line - check nested expressions
-                self.check_expression(ctx, &body, &lambda_indent);
+                let expr_indent = if self.force_strict_condition && lambda_at_wrong_pos {
+                    indent.clone()
+                } else {
+                    lambda_indent.clone()
+                };
+                self.check_expression(ctx, &body, &expr_indent);
             }
         }
     }

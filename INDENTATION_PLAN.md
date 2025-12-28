@@ -1,6 +1,8 @@
 # Indentation Rule Improvement Plan
 
 **Current Status:** 85.3% detection rate (125 missing, 59 extra)
+**Exact Matches:** 121/174 files (69.5%)
+**Remaining:** 53 files to fix
 **Goal:** 100% - exact match on all 174 test fixtures
 
 ## Priority Categories

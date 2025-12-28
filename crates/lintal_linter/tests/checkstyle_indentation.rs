@@ -731,6 +731,14 @@ fn get_config_overrides(file_name: &str) -> Option<HashMap<String, String>> {
             ("tabWidth", "4"),
             ("throwsIndent", "4"),
         ].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()),
+        // TryWithResourcesStrict files need forceStrictCondition=true
+        "InputIndentationTryWithResourcesStrict.java" |
+        "InputIndentationTryWithResourcesStrict1.java" => Some([
+            ("basicOffset", "4"),
+            ("forceStrictCondition", "true"),
+            ("lineWrappingIndentation", "4"),
+            ("tabWidth", "4"),
+        ].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()),
         _ => None,
     }
 }
@@ -1218,4 +1226,71 @@ fn test_debug_invalid_switch() {
 #[test]
 fn test_debug_invalid_for() {
     debug_fixture("InputIndentationInvalidForIndent.java");
+}
+
+#[test]
+fn test_debug_ctor_call1() {
+    debug_fixture("InputIndentationCtorCall1.java");
+}
+
+#[test]
+fn test_debug_android_style() {
+    debug_fixture("InputIndentationAndroidStyle.java");
+}
+
+#[test]
+fn test_debug_new_handler() {
+    debug_fixture("InputIndentationNewHandler.java");
+}
+
+#[test]
+fn test_debug_members2() {
+    debug_fixture("InputIndentationMembers.java");
+}
+
+#[test]
+fn test_debug_try_resources_strict() {
+    debug_fixture("InputIndentationTryWithResourcesStrict.java");
+}
+
+#[test]
+fn test_debug_custom_annotation() {
+    debug_fixture("InputIndentationCustomAnnotation.java");
+}
+
+// === Debug tests for next phase ===
+
+#[test]
+fn test_debug_force_strict() {
+    debug_fixture("InputIndentationNewWithForceStrictCondition.java");
+}
+
+#[test]
+fn test_debug_catch_params() {
+    debug_fixture("InputIndentationCatchParametersOnNewLine.java");
+}
+
+#[test]
+fn test_debug_anon_class_curly() {
+    debug_fixture("InputIndentationAnonymousClassInMethodCurlyOnNewLine.java");
+}
+
+#[test]
+fn test_debug_annotation_closing_paren() {
+    debug_fixture("InputIndentationAnnotationClosingParenthesisEndsInSameIndentationAsOpen.java");
+}
+
+#[test]
+fn test_debug_lambda2() {
+    debug_fixture("InputIndentationLambda2.java");
+}
+
+#[test]
+fn test_debug_lambda4() {
+    debug_fixture("InputIndentationLambda4.java");
+}
+
+#[test]
+fn test_debug_if_and_parameter() {
+    debug_fixture("InputIndentationIfAndParameter.java");
 }

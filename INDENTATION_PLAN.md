@@ -1,35 +1,48 @@
 # Indentation Rule Improvement Plan
 
-**Current Status:** 83.7% detection rate (139 missing, 20 extra)
-**Exact Matches:** 125/174 files (71.8%)
+**Current Status:** 85.3% detection rate (132 missing, 6 extra)
+**Exact Matches:** 129/174 files (74.1%)
 **Goal:** 100% - exact match on all 174 test fixtures
 
-## Recent Fixes
+## Recent Fixes (Session Dec 29 - Continued)
 
-The following lenient mode issues have been fixed:
+### Extra Violation Fixes
+- **Members.java line 54**: Fixed nested method call argument indent. In lenient mode, accept over-indented args when:
+  1. We're in a nested continuation context (`method_name_start > indent.first_level()`)
+  2. The actual indent is greater than the method's line indent (`actual > method_name_start`)
+  This handles chained methods within arguments like `.getString(..., new Foo().bar(...))` where the nested arg is properly over-indented.
+- **TryResourcesNotStrict1**: Fixed anonymous class body indent calculation in `check_object_creation_expression` by adding `indent.with_offset(self.basic_offset)` to combined acceptable levels
+- **Lambda3**: Fixed method chain continuations at column 0 - checkstyle issue #7675 allows chains at leftmost column
+- **TextBlock**: Fixed both opening and closing `"""` checks, including text blocks in parenthesized expressions
+
+### Test Framework Improvements
+- **`//below indent:` parsing**: Added support for `//below indent:X exp:Y warn` comments that indicate violations on the NEXT line
+
+### Earlier Fixes (same session)
+- **CodeBlocks2 line 58**: Fixed brace-on-continuation child indent calculation in `check_block_with_parent_line`
+- **AnnotationArrayInitOldStyle**: Fixed element indent calculation when `{` is on its own line
+- **TryResourcesStrict line 46**: Fixed method name continuation check to use combined acceptable indent
+- **Catch parameters**: Added checks for multi-catch `|` separators and annotations on continuation lines
+
+## Remaining Extra Violations (6)
+
+| File | Extra | Issue |
+|------|-------|-------|
+| InputIndentationInvalidArrInitIndentNoTrailingComments.java | 1 | Array init indent edge case |
+| InputIndentationInvalidArrayInitIndent1.java | 1 | Array init indent edge case |
+| InputIndentationInvalidClassDefIndent1.java | 2 | Class def continuation |
+| InputIndentationNewWithForceStrictCondition.java | 1 | forceStrictCondition=true handling |
+| package-info.java | 1 | Package annotation handling |
+
+## Prior Fixes
+
 - Use base indent for lenient checking in binary expressions
 - Pass base argument indent for nested method invocations
 - Use new_indent for type/lparen continuation checks
 - Use lenient check for method name continuation
-- **Anonymous class body indent**: Accept multiple levels including `new + basicOffset` for over-indented anonymous classes in method arguments (fixes StrictCondition lines 9, 11)
-
-## Remaining Extra Violations (20)
-
-| File | Extra | Issue |
-|------|-------|-------|
-| InputIndentationMembers.java | 1 | Nested method call argument indent (line 54, `exp:>=14`) |
-| InputIndentationCodeBlocks2.java | 1 | Unknown |
-| InputIndentationAnnotationArrayInitOldStyle.java | 1 | Annotation array init |
-| InputIndentationTryWithResourcesStrict.java | 1 | Try-with-resources |
-| InputIndentationTryResourcesNotStrict1.java | 4 | Try-with-resources lenient mode |
-| InputIndentationTextBlock.java | 3 | Text block handling |
-| Various DIFF files | ~9 | Mixed missing/extra issues |
+- **Anonymous class body indent**: Accept multiple levels including `new + basicOffset` for over-indented anonymous classes in method arguments
 
 **Pattern to look for in test files:** `exp:>=N` means lenient mode (accept N or higher).
-
-### Members.java Line 54 Issue
-
-The nested method call argument at line 54 (`new SecondFieldClassWithVeryVeryVeryLongName`) is at indent 19, expected `>=14`. We check against `combined_arg_indent` (20), but in lenient mode should accept >= 14. Attempted fix with `lenient_arg_indent = combined_arg_indent.combine(indent)` caused regressions elsewhere - needs more targeted approach.
 
 ---
 

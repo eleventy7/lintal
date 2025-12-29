@@ -219,10 +219,19 @@ fn check_indentation(source: &str) -> HashSet<usize> {
 /// Parse expected violations from checkstyle test file comments.
 /// Lines with `//indent:X exp:Y warn` are expected to have violations.
 /// Lines with `//indent:X exp:Y` where X != Y are expected to have violations.
+/// Lines with `//below indent:X exp:Y warn` indicate the NEXT line should have a violation.
 fn parse_expected_violations(source: &str) -> HashSet<usize> {
     let mut expected = HashSet::new();
+    let lines: Vec<&str> = source.lines().collect();
 
-    for (line_no, line) in source.lines().enumerate() {
+    for (line_no, line) in lines.iter().enumerate() {
+        // Handle `//below indent:X exp:Y warn` - violation is on the NEXT line
+        if line.contains("//below indent:") && line.contains("warn") {
+            // The violation is on the next line (line_no + 2 because line_no is 0-indexed)
+            expected.insert(line_no + 2);
+            continue;
+        }
+
         // Look for //indent:X exp:Y or //indent:X exp:>=Y patterns
         if let Some(comment_start) = line.find("//indent:") {
             let comment = &line[comment_start..];
@@ -1293,4 +1302,19 @@ fn test_debug_lambda4() {
 #[test]
 fn test_debug_if_and_parameter() {
     debug_fixture("InputIndentationIfAndParameter.java");
+}
+
+#[test]
+fn test_debug_annotation_array_init_old_style() {
+    debug_fixture("InputIndentationAnnotationArrayInitOldStyle.java");
+}
+
+#[test]
+fn test_debug_try_resources_not_strict1() {
+    debug_fixture("InputIndentationTryResourcesNotStrict1.java");
+}
+
+#[test]
+fn test_debug_text_block() {
+    debug_fixture("InputIndentationTextBlock.java");
 }

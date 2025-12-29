@@ -1318,3 +1318,28 @@ fn test_debug_try_resources_not_strict1() {
 fn test_debug_text_block() {
     debug_fixture("InputIndentationTextBlock.java");
 }
+
+#[test]
+fn test_debug_class_def_indent1() {
+    debug_fixture("InputIndentationInvalidClassDefIndent1.java");
+}
+
+#[test]
+fn test_debug_arr_init_no_trailing() {
+    debug_fixture("InputIndentationInvalidArrInitIndentNoTrailingComments.java");
+}
+
+#[test]
+fn test_debug_arr_init1() {
+    debug_fixture("InputIndentationInvalidArrayInitIndent1.java");
+}
+
+#[test]
+fn test_debug_package_info() {
+    debug_fixture("package-info.java");
+}
+
+#[test]
+fn test_debug_difficult_annotations() {
+    debug_fixture("InputIndentationDifficultAnnotations.java");
+}

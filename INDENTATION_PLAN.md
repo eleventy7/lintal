@@ -1,46 +1,35 @@
 # Indentation Rule Improvement Plan
 
-**Current Status:** 85.3% detection rate (132 missing, 6 extra)
-**Exact Matches:** 129/174 files (74.1%)
+**Current Status:** 89.1% detection rate (93 missing, 6 extra)
+**Exact Matches:** 134/174 files (77.0%)
 **Goal:** 100% - exact match on all 174 test fixtures
 
-## Recent Fixes (Session Dec 29 - Continued)
+## Recent Fixes (Session Dec 29 - Continued pt3)
 
-### Extra Violation Fixes
-- **Members.java line 54**: Fixed nested method call argument indent. In lenient mode, accept over-indented args when:
-  1. We're in a nested continuation context (`method_name_start > indent.first_level()`)
-  2. The actual indent is greater than the method's line indent (`actual > method_name_start`)
-  This handles chained methods within arguments like `.getString(..., new Foo().bar(...))` where the nested arg is properly over-indented.
-- **TryResourcesNotStrict1**: Fixed anonymous class body indent calculation in `check_object_creation_expression` by adding `indent.with_offset(self.basic_offset)` to combined acceptable levels
-- **Lambda3**: Fixed method chain continuations at column 0 - checkstyle issue #7675 allows chains at leftmost column
-- **TextBlock**: Fixed both opening and closing `"""` checks, including text blocks in parenthesized expressions
+### Anonymous Class Brace Fixes
+- **AnonymousClassInMethodCurlyOnNewLine.java**: Fixed all 6 missing violations
+  - Check closing brace against expected positions (not just actual brace position)
+  - Use strict checking (`is_indent_exact`) for anonymous class braces
+  - Calculate expected brace positions from indent (where new SHOULD be) + basicOffset + lineWrap
+  - Handle case where new is at "clean" offset (divisible by basicOffset/lineWrap)
 
-### Test Framework Improvements
-- **`//below indent:` parsing**: Added support for `//below indent:X exp:Y warn` comments that indicate violations on the NEXT line
+### Local Class and Type Continuation Fixes
+- **InvalidClassDefIndent1.java**: Fixed all 9 missing violations
+  - Added `class_declaration` handling in `check_statement` for local classes inside methods
+  - Added type continuation check in `check_member_def` for types on continuation lines after modifiers
+  - Only check type continuation when non-annotation modifiers exist on declaration line
 
-### Earlier Fixes (same session)
-- **CodeBlocks2 line 58**: Fixed brace-on-continuation child indent calculation in `check_block_with_parent_line`
-- **AnnotationArrayInitOldStyle**: Fixed element indent calculation when `{` is on its own line
-- **TryResourcesStrict line 46**: Fixed method name continuation check to use combined acceptable indent
-- **Catch parameters**: Added checks for multi-catch `|` separators and annotations on continuation lines
+### Binary Expression and Text Block Fixes
+- **MultilineStatements.java**: Fixed all 4 missing violations
+  - Fixed lenient mode to check against expected_indent (expr_start + lineWrap)
+  - Added text block closing `"""` check inside binary expressions
+  - Flag under-indented binary expression continuations (actual < expected AND actual < base + lineWrap)
 
-## Remaining Extra Violations (6)
-
-| File | Extra | Issue |
-|------|-------|-------|
-| InputIndentationInvalidArrInitIndentNoTrailingComments.java | 1 | Array init indent edge case |
-| InputIndentationInvalidArrayInitIndent1.java | 1 | Array init indent edge case |
-| InputIndentationInvalidClassDefIndent1.java | 2 | Class def continuation |
-| InputIndentationNewWithForceStrictCondition.java | 1 | forceStrictCondition=true handling |
-| package-info.java | 1 | Package annotation handling |
-
-## Prior Fixes
-
-- Use base indent for lenient checking in binary expressions
-- Pass base argument indent for nested method invocations
-- Use new_indent for type/lparen continuation checks
-- Use lenient check for method name continuation
-- **Anonymous class body indent**: Accept multiple levels including `new + basicOffset` for over-indented anonymous classes in method arguments
+### Earlier Session Fixes
+- Members.java line 54: Fixed nested method call argument indent
+- TryResourcesNotStrict1: Fixed anonymous class body indent calculation
+- Lambda3: Fixed method chain continuations at column 0
+- Various extra violation fixes (combining brace positions correctly)
 
 **Pattern to look for in test files:** `exp:>=N` means lenient mode (accept N or higher).
 

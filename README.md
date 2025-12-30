@@ -26,13 +26,13 @@ Since introducing lintal, we're spending less time on the checkstyle step—givi
 
 lintal is significantly faster than checkstyle due to native compilation and parallel processing (along with the Ruff heritage).
 
-**Benchmark vs Checkstyle 12.3.0** (same files, 23 of 29 supported rules, 10 runs each after warmup):
+**Benchmark vs Checkstyle 12.3.0** (same files, 24 of 30 supported rules including Indentation, 10 runs each after warmup):
 
 | Repository | Files | Checkstyle | lintal | Speedup |
 |------------|-------|------------|--------|---------|
-| Agrona | 289 | 1.49s ± 0.02s | 0.32s ± 0.02s | **4.7x** |
-| Artio | 726 | 2.55s ± 0.03s | 0.65s ± 0.02s | **3.9x** |
-| Aeron | 929 | 4.76s ± 0.08s | 1.54s ± 0.11s | **3.1x** |
+| Agrona | 289 | 1.74s ± 0.08s | 0.72s ± 0.09s | **2.4x** |
+| Artio | 726 | 3.09s ± 0.17s | 1.69s ± 0.10s | **1.8x** |
+| Aeron | 929 | 5.30s ± 0.07s | 3.64s ± 0.20s | **1.5x** |
 
 ![Benchmark Results](docs/benchmark_results.png)
 
@@ -90,66 +90,73 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-lintal currently implements 29 checkstyle rules with 100% compatibility against checkstyle's own test suite.
+lintal currently implements 30 checkstyle rules. We validate against checkstyle's own test fixtures and real-world projects.
 
-### Whitespace (12 rules)
+**Status key:**
+- ✓ = Passes all checkstyle test fixtures
+- *89%* = Detection rate on test fixtures (prioritizes zero false positives)
+
+All rules achieve zero false positives on real-world projects (Aeron, Artio, Agrona).
+
+### Whitespace (13 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| WhitespaceAround | ✅ | 100% compatible |
-| WhitespaceAfter | ✅ | 100% compatible |
-| NoWhitespaceAfter | ✅ | 100% compatible |
-| NoWhitespaceBefore | ✅ | 100% compatible |
-| SingleSpaceSeparator | ✅ | 100% compatible |
-| ParenPad | ✅ | 100% compatible |
-| TypecastParenPad | ✅ | 100% compatible |
-| MethodParamPad | ✅ | 100% compatible |
-| EmptyForInitializerPad | ✅ | 100% compatible |
-| FileTabCharacter | ✅ | 100% compatible |
-| OperatorWrap | ❌ | 100% compatible |
-| EmptyLineSeparator | ❌ | 100% compatible |
+| WhitespaceAround | ✅ | ✓ |
+| WhitespaceAfter | ✅ | ✓ |
+| NoWhitespaceAfter | ✅ | ✓ |
+| NoWhitespaceBefore | ✅ | ✓ |
+| SingleSpaceSeparator | ✅ | ✓ |
+| ParenPad | ✅ | ✓ |
+| TypecastParenPad | ✅ | ✓ |
+| MethodParamPad | ✅ | ✓ |
+| EmptyForInitializerPad | ✅ | ✓ |
+| FileTabCharacter | ✅ | ✓ |
+| OperatorWrap | ❌ | ✓ |
+| EmptyLineSeparator | ❌ | ✓ |
+| Indentation | ✅ | 89% |
 
 ### Blocks (6 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| LeftCurly | ✅ (partial) | 100% compatible |
-| RightCurly | ✅ (partial) | 100% compatible |
-| NeedBraces | ❌ | 100% compatible |
-| EmptyBlock | ❌ | 100% compatible |
-| EmptyCatchBlock | ❌ | 100% compatible |
-| AvoidNestedBlocks | ❌ | 100% compatible |
+| LeftCurly | ✅ (partial) | ✓ |
+| RightCurly | ✅ (partial) | ✓ |
+| NeedBraces | ❌ | ✓ |
+| EmptyBlock | ❌ | ✓ |
+| EmptyCatchBlock | ❌ | ✓ |
+| AvoidNestedBlocks | ❌ | ✓ |
 
 ### Modifiers (4 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| ModifierOrder | ✅ | 100% compatible |
-| RedundantModifier | ✅ | 100% compatible |
-| FinalParameters | ✅ | 100% compatible |
-| FinalLocalVariable | ✅ | 100% compatible |
+| ModifierOrder | ✅ | ✓ |
+| RedundantModifier | ✅ | ✓ |
+| FinalParameters | ✅ | ✓ |
+| FinalLocalVariable | ✅ | ✓ |
 
 ### Miscellaneous (2 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| UpperEll | ✅ | 100% compatible |
-| ArrayTypeStyle | ✅ | 100% compatible |
+| UpperEll | ✅ | ✓ |
+| ArrayTypeStyle | ✅ | ✓ |
 
 ### Imports (2 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| UnusedImports | ✅ | 100% compatible |
-| RedundantImport | ✅ | 100% compatible |
+| UnusedImports | ✅ | ✓ |
+| RedundantImport | ✅ | ✓ |
 
 ### Coding (3 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| OneStatementPerLine | ✅ | 100% compatible |
-| MultipleVariableDeclarations | ✅ (partial) | 100% compatible |
-| SimplifyBooleanReturn | ❌ | 100% compatible |
+| OneStatementPerLine | ✅ | ✓ |
+| MultipleVariableDeclarations | ✅ (partial) | ✓ |
+| SimplifyBooleanReturn | ❌ | ✓ |
 
 ## Development
 

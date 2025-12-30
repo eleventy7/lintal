@@ -1,170 +1,133 @@
 # Indentation Rule Improvement Plan
 
-**Current Status:** 89.1% detection rate (93 missing, 6 extra)
-**Exact Matches:** 134/174 files (77.0%)
+**Current Status:** 91.8% detection rate (70 missing, 0 extra)
+**Exact Matches:** 141/174 files (81.0%)
 **Goal:** 100% - exact match on all 174 test fixtures
 
-## Recent Fixes (Session Dec 29 - Continued pt3)
+## Recent Fixes (Session Dec 29 - Continued pt7)
+
+### Record Declaration Line-Wrapped Fixes
+- **LineWrappedRecordDeclaration.java**: Fixed all 6 missing violations
+- Added handling for `formal_parameters` (record's parentheses)
+- Added handling for `super_interfaces` (implements clause)
+- Added `check_super_interfaces_type_list` for type names on continuation lines
+
+**Key changes to `check_class_declaration`:**
+- Check closing `)` of record formal_parameters on continuation lines
+- Check opening `(` for nested records
+- Check `implements` keyword and type_list for implements clauses
+
+## Recent Fixes (Session Dec 29 - Continued pt6)
+
+### Lambda Expression Block Indent Fixes
+- **Lambda3.java**: Fixed 2 missing violations for misaligned lambda block content
+- **Lambda6.java**: Fixed 14 extra violations (false positives with lineWrappingIndentation=0)
+- **Lambda8.java**: Fixed 1 extra violation (closing brace at line-wrapped position)
+- **Lambda1.java**: Maintained correct behavior for nested lambdas in method calls
+
+**Key changes to `check_lambda_expression`:**
+- When lambda NOT at start of line but line is over-indented → parent statement is misaligned, use expected
+- When lambda at start of line at `indent + basicOffset` or `indent + lineWrap` → use combined indent
+- Otherwise use lambda's actual position as base
+
+## Recent Fixes (Session Dec 29 - Continued pt5)
+
+### While Statement and Binary Expression Fixes
+- **InputIndentationInvalidWhileIndent.java**: Fixed all 3 remaining missing violations
+- Fixed deeply nested binary expression threshold logic
+
+**Changes made:**
+- Updated `check_while_statement` to use actual position for misaligned statements
+- Changed deep nesting threshold from absolute to relative (`indent + 2*lineWrap`)
+- Updated expected_indent heuristic: if `expr_start < indent + lineWrap`, use `indent` (nested context), else use `indent + lineWrap` (statement context)
+- For binary expressions in method call arguments, pass `indent` instead of `nested_indent` to avoid double-counting lineWrap
+
+### If Statement Condition Fixes
+- **InputIndentationInvalidIfIndent2.java**: Fixed all 5 missing violations for binary expression continuations in if-conditions
+- **InputIndentationValidIfIndent.java**: Fixed lparen/rparen checking with correct line-wrapped indent
+- **InputIndentationAndroidStyle.java**: Fixed misaligned if-statement expression checking
+
+**Changes made to `check_if_statement`:**
+- Use line-wrapped indent for lparen on continuation lines
+- Check condition content with line-wrapped indent
+- Accept both indent and line-wrapped indent for rparen (handles `) {` vs `)` alone)
+- For misaligned if statements, use actual position for expression continuation calculation
+
+**Changes made to `check_binary_expression`:**
+- Use `ctx.column_from_node(node)` instead of `ctx.get_line_start(expr_line)` to get actual expression start column
+- Determine expected_indent based on expression position:
+  - If `indent > expr_start`: expression is under-indented, use context indent
+  - Otherwise: use `indent + lineWrappingIndentation`
+
+## Previous Fixes (Session Dec 29 - Continued pt4)
+
+### While/Do-While Condition Fixes
+- **InputIndentationInvalidWhileIndent.java**: Fixed all 6 missing violations (was Missing: 6)
+- **InputIndentationInvalidDoWhileIndent.java**: Fixed all 5 missing violations (was Missing: 5)
+
+**Changes made:**
+- Added condition checking to `check_while_statement` and `check_do_while_statement`
+- Check binary expressions inside conditions via `check_expression`
+- Check opening paren if on its own line (should be at statement indent)
+- Check closing paren if on its own line (should be at statement indent)
+- Check condition content (identifiers, expressions) if on own line
+
+### Binary Expression Lenient Mode Fixes
+- **Fixed all 6 extra violations** (false positives):
+  - InputIndentationIfAndParameter.java: 2 extra → 0 extra
+  - InputIndentationNewChildrenSevntuConfig.java: 1 extra → 0 extra
+  - InputIndentationValidAssignIndent.java: 1 extra → 0 extra
+  - InputIndentationCheckMethodParenOnNewLine1.java: 2 extra → 0 extra
+
+**Root cause and fix:**
+1. For deeply nested binary expressions (inside method call arguments), `indent` accumulates with each nesting level, making `base_line_wrapped` too high
+2. For expressions where the start is misaligned, continuations shouldn't be based on the wrong start position
+3. Special case: continuations at exactly `expr_start` should be accepted (aligned with expression)
+
+**Changes made to `check_binary_expression`:**
+- Compute `expected_indent = min(expr_based, indent)` when expression is misaligned from context
+- Accept continuations exactly at `expr_start` as valid alignment
+- For deeply nested cases (expr_start > 3*lineWrap), use `indent` as floor instead of `indent + lineWrap`
+
+## Previous Fixes (Session Dec 29 - Continued pt3)
 
 ### Anonymous Class Brace Fixes
 - **AnonymousClassInMethodCurlyOnNewLine.java**: Fixed all 6 missing violations
-  - Check closing brace against expected positions (not just actual brace position)
-  - Use strict checking (`is_indent_exact`) for anonymous class braces
-  - Calculate expected brace positions from indent (where new SHOULD be) + basicOffset + lineWrap
-  - Handle case where new is at "clean" offset (divisible by basicOffset/lineWrap)
 
 ### Local Class and Type Continuation Fixes
 - **InvalidClassDefIndent1.java**: Fixed all 9 missing violations
-  - Added `class_declaration` handling in `check_statement` for local classes inside methods
-  - Added type continuation check in `check_member_def` for types on continuation lines after modifiers
-  - Only check type continuation when non-annotation modifiers exist on declaration line
 
 ### Binary Expression and Text Block Fixes
 - **MultilineStatements.java**: Fixed all 4 missing violations
-  - Fixed lenient mode to check against expected_indent (expr_start + lineWrap)
-  - Added text block closing `"""` check inside binary expressions
-  - Flag under-indented binary expression continuations (actual < expected AND actual < base + lineWrap)
-
-### Earlier Session Fixes
-- Members.java line 54: Fixed nested method call argument indent
-- TryResourcesNotStrict1: Fixed anonymous class body indent calculation
-- Lambda3: Fixed method chain continuations at column 0
-- Various extra violation fixes (combining brace positions correctly)
 
 **Pattern to look for in test files:** `exp:>=N` means lenient mode (accept N or higher).
 
 ---
 
-### 2. HIGH IMPACT - forceStrictCondition Support (11 missing)
+## Known Issues
 
-**File:** InputIndentationNewWithForceStrictCondition.java
+### Extra Violations: RESOLVED ✓
+All extra violations (false positives) have been fixed. (0 extra)
 
-**Config:** `forceStrictCondition=true`, `lineWrappingIndentation=8`
+### Remaining Missing Violations (79 total)
 
-**Missing patterns:**
-- Line 21: Array bracket `]` continuation (11 vs 12)
-- Line 25: Array bracket `[]` at wrong position (4 vs 12)
-- Line 31: Nested `new` inside another `new` argument (16 vs 24)
-- Line 32: Anonymous class body content (20 vs 28,32,36)
-- Line 33: Closing brace/paren (16 vs 24,28,32)
-- Line 35: Binary expression continuation (35 vs 16)
-
-**Debug command:**
-```bash
-# Add this test first:
-# fn test_debug_force_strict() { debug_fixture("InputIndentationNewWithForceStrictCondition.java"); }
-cargo test --package lintal_linter --test checkstyle_indentation test_debug_force_strict -- --nocapture
-```
-
-**AST dump:**
-```bash
-cat /Users/shaunlaurens/src/lintal/target/checkstyle-tests/src/test/resources/com/puppycrawl/tools/checkstyle/checks/indentation/indentation/InputIndentationNewWithForceStrictCondition.java | head -40 | ./target/debug/dump_java_ast
-```
-
-**Fix needed:** Add config override for this file in `get_config_overrides()` function, then fix the specific patterns.
+| Category | Files | Missing |
+|----------|-------|---------|
+| Record declarations | LineWrappedRecordDeclaration, RecordsAndCompactCtors | 9 |
+| Array init | InvalidArrayInit files | ~12 |
+| Lambda expressions | Lambda (arrow edge cases) | 2 |
+| Switch statements | InvalidSwitchIndent, SwitchExpressionWrapping | 6 |
+| Method calls | MethodCallLineWrap, ChainedMethodCalls | 4 |
+| Other | Various | ~46 |
 
 ---
 
-### 3. MEDIUM IMPACT - Catch Parameters (5 missing)
+## Next Steps
 
-**File:** InputIndentationCatchParametersOnNewLine.java
-
-**Missing patterns:**
-- Multi-catch `|` separator on new line
-- Exception type continuation after annotation
-- Annotation before exception type
-
-**Debug command:**
-```bash
-# Add: fn test_debug_catch_params() { debug_fixture("InputIndentationCatchParametersOnNewLine.java"); }
-```
-
-**AST structure:**
-```
-catch_clause
-  catch_formal_parameter
-    modifiers (may contain annotations)
-    catch_type
-      type_identifier
-      | (for multi-catch)
-      type_identifier
-```
-
-**Fix location:** `check_try_statement` in mod.rs - need to add catch parameter checks.
-
----
-
-### 4. MEDIUM IMPACT - Anonymous Class Curly on New Line (6 missing)
-
-**File:** InputIndentationAnonymousClassInMethodCurlyOnNewLine.java
-
-**Pattern:** When anonymous class `{` is on a new line, checkstyle expects specific indent levels.
-
-Expected format: `exp:16,20,24 warn` means any of those values is expected, but actual is wrong.
-
-**Debug command:**
-```bash
-# Add: fn test_debug_anon_class_curly() { debug_fixture("InputIndentationAnonymousClassInMethodCurlyOnNewLine.java"); }
-```
-
-**Fix location:** `check_object_creation_expression` - handle class_body opening brace on new line.
-
----
-
-### 5. MEDIUM IMPACT - Annotation Closing Paren (5 missing)
-
-**File:** InputIndentationAnnotationClosingParenthesisEndsInSameIndentationAsOpen.java
-
-**Pattern:** Annotation `)` on new line should match `@` or `(` indent.
-
-```java
-@SimpleType( value = Boolean.class
-                )   // indent:16 exp:0 warn - should match @SimpleType
-```
-
-**Fix location:** `check_modifiers_annotations` - add check for rparen continuation.
-
----
-
-### 6. LOWER IMPACT - Various Patterns
-
-| File | Missing | Pattern |
-|------|---------|---------|
-| InputIndentationInvalidClassDefIndent1.java | 9 | Class def continuation |
-| InputIndentationLineWrappedRecordDeclaration.java | 6 | Record declarations |
-| InputIndentationInvalidWhileIndent.java | 6 | While loop conditions |
-| InputIndentationInvalidDoWhileIndent.java | 5 | Do-while conditions |
-| InputIndentationRecordsAndCompactCtors.java | 3 | Record compact constructors |
-| InputIndentationInvalidTryIndent.java | 3 | Try statement parts |
-| InputIndentationInvalidSwitchIndent.java | 3 | Switch cases |
-| InputIndentationTextBlock.java | 3 | Text blocks |
-
----
-
-## Implementation Order
-
-### Day 1: Fix False Positives First (Extra violations)
-
-1. **Fix lenient mode in object creation args** (mod.rs:2479-2506)
-   - Currently using strict `is_acceptable()`
-   - Need hybrid: strict for over-indent, lenient for under-indent
-   - Test: `test_debug_members`, `test_debug_chained_method_calls`
-
-2. **Fix chained method call false positives**
-   - Lines 43-45 in InputIndentationChainedMethodCalls.java flagged incorrectly
-   - They're at correct indent but being flagged
-
-### Day 2: Add Missing Constructs
-
-3. **Catch parameters** - new check needed
-4. **Annotation closing paren** - extend `check_modifiers_annotations`
-5. **Anonymous class brace on new line** - extend `check_object_creation_expression`
-
-### Day 3: Special Configs and Edge Cases
-
-6. **forceStrictCondition=true files** - add config overrides
-7. **Record declarations** - may need new handlers
-8. **Text blocks** - special string literal handling
+1. **Record declarations** - Add record-specific handlers
+2. **Lambda expressions** - Review lambda parameter handling
+3. **Switch statements** - Fix switch expression wrapping
+4. **Method call continuations** - Handle chained method calls
 
 ---
 

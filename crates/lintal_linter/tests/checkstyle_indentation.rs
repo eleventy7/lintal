@@ -826,6 +826,21 @@ fn test_debug_lambda1() {
 }
 
 #[test]
+fn test_debug_lambda6() {
+    debug_fixture("InputIndentationLambda6.java");
+}
+
+#[test]
+fn test_debug_lambda_base() {
+    debug_fixture("InputIndentationLambda.java");
+}
+
+#[test]
+fn test_debug_record_line_wrapped() {
+    debug_fixture("InputIndentationLineWrappedRecordDeclaration.java");
+}
+
+#[test]
 fn test_debug_try_resources() {
     debug_fixture("InputIndentationTryResourcesNotStrict1.java");
 }
@@ -833,6 +848,11 @@ fn test_debug_try_resources() {
 #[test]
 fn test_debug_valid_assign() {
     debug_fixture("InputIndentationValidAssignIndent.java");
+}
+
+#[test]
+fn test_debug_valid_if() {
+    debug_fixture("InputIndentationValidIfIndent.java");
 }
 
 #[test]
@@ -863,6 +883,31 @@ fn test_debug_guava() {
 #[test]
 fn test_debug_ctor_call() {
     debug_fixture("InputIndentationCtorCall.java");
+}
+
+#[test]
+fn test_debug_method_paren_newline1() {
+    debug_fixture("InputIndentationCheckMethodParenOnNewLine1.java");
+}
+
+#[test]
+fn test_debug_new_children_sevntu() {
+    debug_fixture("InputIndentationNewChildrenSevntuConfig.java");
+}
+
+#[test]
+fn test_debug_invalid_while() {
+    debug_fixture("InputIndentationInvalidWhileIndent.java");
+}
+
+#[test]
+fn test_debug_invalid_do_while() {
+    debug_fixture("InputIndentationInvalidDoWhileIndent.java");
+}
+
+#[test]
+fn test_debug_invalid_if2() {
+    debug_fixture("InputIndentationInvalidIfIndent2.java");
 }
 
 #[test]

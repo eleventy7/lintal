@@ -1042,6 +1042,42 @@ qux);
     assert!(violations.contains(&5), "Line 5 (qux at col 0) should be flagged");
 }
 
+#[test]
+fn test_throw_statement_binary_expr_any_indent() {
+    // Checkstyle accepts ANY indentation for binary expression continuations
+    // inside throw statements, similar to return statements.
+    let source = r#"
+class Foo {
+    void bar() {
+        throw new Ex("msg" +
+            arg);
+    }
+}
+"#;
+    // Should pass with strict config - checkstyle is lenient here
+    let violations = check_indentation_with_config(source, &strict_config());
+    assert!(violations.is_empty(),
+        "Throw statement should accept binary expr at any indent, got lines: {:?}", violations);
+}
+
+#[test]
+fn test_return_statement_binary_expr_visual_align() {
+    // Checkstyle accepts visual alignment for binary expression continuations
+    // inside return statements (aligning with previous operand).
+    let source = r#"
+class Foo {
+    boolean equals(Object other) {
+        return otherSet.value == value &&
+               otherSet.size == size;
+    }
+}
+"#;
+    // Should pass with strict config - checkstyle allows visual alignment
+    let violations = check_indentation_with_config(source, &strict_config());
+    assert!(violations.is_empty(),
+        "Return statement should accept visual alignment, got lines: {:?}", violations);
+}
+
 // ============================================================================
 // Expression continuation and method argument alignment tests
 // ============================================================================
@@ -1170,6 +1206,57 @@ class Foo {
     let violations = check_indentation(source);
     assert!(violations.is_empty(),
         "Expected no violations for nested method call args aligned (lenient), got lines: {:?}", violations);
+}
+
+#[test]
+fn test_anonymous_class_in_lambda_aligned() {
+    // Pattern from aeron ClusterTest:
+    // supplier((i) -> new Service[]{ new Service()
+    // {   // <- aligned with lambda start at col 12
+    //     ...
+    // }.index(i) }
+    // );
+    // Checkstyle accepts alignment of anonymous class braces with lambda position.
+    let source = r#"
+class Foo {
+    void bar() {
+        supplier(
+            (i) -> new Service[]{ new Service()
+            {
+                public void method() { }
+            }.index(i) }
+        );
+    }
+}
+"#;
+    // Strict mode - should pass (checkstyle accepts this alignment)
+    let violations = check_indentation_with_config(source, &strict_config());
+    assert!(violations.is_empty(),
+        "Expected no violations for anonymous class in lambda aligned, got lines: {:?}", violations);
+}
+
+#[test]
+fn test_nested_method_call_arg_at_method_line_start() {
+    // Pattern from aeron DriverEventLoggerTest:
+    // assertEquals(uri,
+    //     logBuffer.getStringAscii(encodedMsgOffset(recordOffset),
+    //     LITTLE_ENDIAN));
+    //
+    // The inner arg LITTLE_ENDIAN is at col 12, same as logBuffer's line start.
+    // Checkstyle accepts this visual alignment.
+    let source = r#"
+class Foo {
+    void bar() {
+        assertEquals(uri,
+            logBuffer.getStringAscii(encodedMsgOffset(recordOffset),
+            LITTLE_ENDIAN));
+    }
+}
+"#;
+    // Strict mode - should pass (checkstyle accepts this alignment)
+    let violations = check_indentation_with_config(source, &strict_config());
+    assert!(violations.is_empty(),
+        "Expected no violations for nested arg at method line start, got lines: {:?}", violations);
 }
 
 #[test]

@@ -2342,6 +2342,55 @@ impl Indentation {
 
     /// Check indentation of binary/ternary expression continuations.
     fn check_binary_expression(&self, ctx: &HandlerContext, node: &CstNode, indent: &IndentLevel) {
+        // Check if this binary expression is inside a context where checkstyle is lenient.
+        // Checkstyle is very lenient with binary/ternary expression continuations in:
+        // - return_statement / throw_statement: accepts any indentation even in strict mode
+        // - lambda_expression: accepts alignment with containing method call level
+        // - variable_declarator in local_variable_declaration: lenient for complex initializers
+        // - argument_list: lenient for ternary expressions inside method call arguments
+        // Limit depth to prevent stack overflow on deeply nested structures.
+        let in_lenient_statement_context = {
+            let mut current = node.parent();
+            let mut found = false;
+            let mut depth = 0;
+            const MAX_DEPTH: usize = 50;
+            while let Some(p) = current {
+                if depth >= MAX_DEPTH {
+                    break;
+                }
+                depth += 1;
+                match p.kind() {
+                    "return_statement" | "throw_statement" | "lambda_expression"
+                    | "argument_list" => {
+                        found = true;
+                        break;
+                    }
+                    // Variable initializers with complex expressions
+                    "variable_declarator" => {
+                        if p.parent().is_some_and(|gp| gp.kind() == "local_variable_declaration") {
+                            found = true;
+                            break;
+                        }
+                        current = p.parent();
+                    }
+                    // Stop at statement boundaries
+                    "expression_statement" | "if_statement" | "while_statement"
+                    | "for_statement" | "do_statement" | "switch_statement"
+                    | "try_statement" | "synchronized_statement" | "block" => break,
+                    _ => current = p.parent(),
+                }
+            }
+            found
+        };
+
+        // If in return/throw context, skip strict checking entirely.
+        // We don't recursively check children here - just skip checking this node's
+        // continuation indentation. The children will be checked by the parent's
+        // check_expression traversal.
+        if in_lenient_statement_context {
+            return;
+        }
+
         let expr_line = self.line_no(ctx, node);
         // Use the actual column where the binary expression node starts, not the line's indentation.
         // This is important for expressions inside parentheses (e.g., `if (a || b)`) where the
@@ -2912,16 +2961,18 @@ impl Indentation {
                             if !skip_arg_indent_check && ctx.is_on_start_of_line(&child) {
                                 let actual = ctx.get_line_start(child_line);
 
-                                // For nested method calls, also accept alignment with outer context
+                                // For nested method calls, accept alignment with:
+                                // 1. The outer context level (parent method's base indent)
+                                // 2. This method call's line start (for visual alignment)
                                 // This handles patterns like:
-                                //   assertEquals(
-                                //       EnumSet.complementOf(EnumSet.of(
-                                //       VALUE_A,         <- at col 12, same as outer arg indent
-                                //       VALUE_B)),
-                                //       target);
+                                //   assertEquals(uri,
+                                //       logBuffer.getStringAscii(encodedMsgOffset(...),
+                                //       LITTLE_ENDIAN));   <- at col 12, same as logBuffer's line start
                                 let is_at_outer_context = actual == indent.first_level();
+                                let is_at_method_line_start = actual == method_name_start;
 
                                 if !is_at_outer_context
+                                    && !is_at_method_line_start
                                     && !ctx.is_indent_acceptable(actual, &combined_arg_indent)
                                 {
                                     // In lenient mode, accept over-indented args when:
@@ -3043,6 +3094,7 @@ impl Indentation {
         // - Based on expected new position (passed indent): indent, indent+basic, indent+lineWrap
         // - Based on actual new position when new is at a "clean" offset from indent
         //   (divisible by basic_offset or line_wrapping)
+        // - Based on containing lambda expression position (for anonymous classes in lambdas)
         let mut expected_brace = indent.add_acceptable(&[
             indent.first_level() + self.basic_offset,
             indent.first_level() + self.line_wrapping_indentation,
@@ -3062,6 +3114,43 @@ impl Indentation {
                     new_start + self.line_wrapping_indentation,
                 ]);
             }
+        }
+
+        // If we're inside a lambda expression, also accept alignment with the lambda's position.
+        // This handles patterns like:
+        //   supplier((i) -> new Service[]{ new Service()
+        //   {  // <- aligned with lambda start
+        //       ...
+        //   }.index(i) }
+        // );
+        let lambda_start = {
+            let mut current = node.parent();
+            let mut lambda_pos = None;
+            while let Some(p) = current {
+                if p.kind() == "lambda_expression" {
+                    lambda_pos = Some(ctx.get_line_start(self.line_no(ctx, &p)));
+                    break;
+                }
+                // Stop at statement boundaries
+                if matches!(
+                    p.kind(),
+                    "expression_statement"
+                        | "local_variable_declaration"
+                        | "return_statement"
+                        | "block"
+                        | "method_declaration"
+                ) {
+                    break;
+                }
+                current = p.parent();
+            }
+            lambda_pos
+        };
+        if let Some(lambda_indent) = lambda_start {
+            expected_brace = expected_brace.add_acceptable(&[
+                lambda_indent,
+                lambda_indent + self.basic_offset,
+            ]);
         }
 
         for child in node.children() {

@@ -302,7 +302,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lintal"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "lintal_checkstyle"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "quick-xml",
  "serde",
@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "lintal_diagnostics"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "get-size2",
  "is-macro",
@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "lintal_java_cst"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "lintal_java_parser",
  "lintal_text_size",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "lintal_java_parser"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "tree-sitter",
  "tree-sitter-java",
@@ -357,7 +357,7 @@ dependencies = [
 
 [[package]]
 name = "lintal_linter"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "lazy_static",
  "lintal_checkstyle",
@@ -372,7 +372,7 @@ dependencies = [
 
 [[package]]
 name = "lintal_source_file"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "get-size2",
  "lintal_text_size",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "lintal_text_size"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "get-size2",
  "serde",

@@ -1,8 +1,26 @@
 # Indentation Rule Improvement Plan
 
-**Current Status:** 91.8% detection rate (70 missing, 0 extra)
-**Exact Matches:** 141/174 files (81.0%)
+**Current Status:** 93.0% detection rate (60 missing, 0 extra)
+**Exact Matches:** 143/174 files (82.2%)
 **Goal:** 100% - exact match on all 174 test fixtures
+
+## Recent Fixes (Session Dec 29 - Continued pt8)
+
+### Array Initialization Context Fixes
+- **InputIndentationArrays.java**: Fixed 8 extra violations for `return new byte[] {` case
+- **InputIndentationValidArrayInitIndentTwo.java**: Fixed 8 extra violations for field init case
+- **InputIndentationNewHandler.java**: Fixed 2 extra violations for nested array_creation_expression
+
+**Key changes:**
+- Added `check_array_creation_expression_with_context` to distinguish variable init vs expression context
+- Variable initializers (`int[] x = new int[] {...}`) use `arrayInitIndent` for elements
+- Expression contexts (`return new byte[] {...}`) use `lineWrappingIndentation` for elements
+- For inline brace with content on same line, also accept alignment with first element
+- For misaligned parent braces, use lenient mode only for nested `array_creation_expression` children
+
+**Files changed:**
+- `mod.rs`: Added context-aware array creation handling
+- Variable init path now calls `check_array_creation_expression_with_context(ctx, node, indent, true)`
 
 ## Recent Fixes (Session Dec 29 - Continued pt7)
 
@@ -109,11 +127,11 @@
 ### Extra Violations: RESOLVED ✓
 All extra violations (false positives) have been fixed. (0 extra)
 
-### Remaining Missing Violations (79 total)
+### Remaining Missing Violations (60 total)
 
 | Category | Files | Missing |
 |----------|-------|---------|
-| Record declarations | LineWrappedRecordDeclaration, RecordsAndCompactCtors | 9 |
+| Record declarations | RecordsAndCompactCtors | 2 |
 | Array init | InvalidArrayInit files | ~12 |
 | Lambda expressions | Lambda (arrow edge cases) | 2 |
 | Switch statements | InvalidSwitchIndent, SwitchExpressionWrapping | 6 |

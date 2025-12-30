@@ -841,6 +841,36 @@ fn test_debug_record_line_wrapped() {
 }
 
 #[test]
+fn test_debug_array_init() {
+    debug_fixture("InputIndentationInvalidArrayInitIndent.java");
+}
+
+#[test]
+fn test_debug_array_init1() {
+    debug_fixture("InputIndentationInvalidArrayInitIndent1.java");
+}
+
+#[test]
+fn test_debug_array_init_2d() {
+    debug_fixture("InputIndentationInvalidArrayInitIndent2D.java");
+}
+
+#[test]
+fn test_debug_array_init_emoji() {
+    debug_fixture("InputIndentationArrayInitIndentWithEmoji.java");
+}
+
+#[test]
+fn test_debug_arrays() {
+    debug_fixture("InputIndentationArrays.java");
+}
+
+#[test]
+fn test_debug_array_two() {
+    debug_fixture("InputIndentationValidArrayInitIndentTwo.java");
+}
+
+#[test]
 fn test_debug_try_resources() {
     debug_fixture("InputIndentationTryResourcesNotStrict1.java");
 }

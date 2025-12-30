@@ -1136,7 +1136,17 @@ impl Indentation {
                             self.check_expression(ctx, &declarator_child, &expr_indent);
                         } else if !is_text_block {
                             // For non-line-wrapped, non-text-block initializers, check with statement indent
-                            self.check_expression(ctx, &declarator_child, indent);
+                            // For array_creation_expression in variable init, use arrayInitIndent for elements
+                            if declarator_child.kind() == "array_creation_expression" {
+                                self.check_array_creation_expression_with_context(
+                                    ctx,
+                                    &declarator_child,
+                                    indent,
+                                    true, // in_variable_init
+                                );
+                            } else {
+                                self.check_expression(ctx, &declarator_child, indent);
+                            }
                         }
                         break;
                     }
@@ -3106,6 +3116,19 @@ impl Indentation {
         node: &CstNode,
         indent: &IndentLevel,
     ) {
+        self.check_array_creation_expression_with_context(ctx, node, indent, false);
+    }
+
+    /// Check indentation of array creation expression with variable init context flag.
+    /// When in_variable_init is true, uses arrayInitIndent for elements.
+    /// Otherwise, uses lineWrappingIndentation.
+    fn check_array_creation_expression_with_context(
+        &self,
+        ctx: &HandlerContext,
+        node: &CstNode,
+        indent: &IndentLevel,
+        in_variable_init: bool,
+    ) {
         // Get the array creation expression's starting position for line wrapping
         let new_line = self.line_no(ctx, node);
         let new_start = ctx.get_line_start(new_line);
@@ -3124,8 +3147,21 @@ impl Indentation {
                     self.check_array_dimensions(ctx, &child, indent, &line_wrapped);
                 }
                 "array_initializer" => {
-                    // Pass the new expression's start as the base indent
-                    self.check_array_initializer(ctx, &child, &new_indent);
+                    // For variable initializers, elements use arrayInitIndent from statement
+                    // For expression contexts (return, method args), elements use lineWrappingIndentation
+                    let base_indent = if in_variable_init {
+                        new_indent.clone()
+                    } else {
+                        // Adjust so that arrayInitIndent offset gives lineWrappingIndentation
+                        if self.line_wrapping_indentation >= self.array_init_indent {
+                            new_indent.with_offset(
+                                self.line_wrapping_indentation - self.array_init_indent,
+                            )
+                        } else {
+                            new_indent.clone()
+                        }
+                    };
+                    self.check_array_initializer(ctx, &child, &base_indent);
                 }
                 _ => {}
             }
@@ -3212,8 +3248,19 @@ impl Indentation {
             }
         }
 
-        // Elements should be indented by array_init_indent - use lenient mode for elements
+        // Check if the opening brace is at an acceptable position (using exact check)
+        // If not, use lenient mode for child elements
+        let brace_misaligned = if let Some(lcurly) = &lcurly {
+            let actual = ctx.column_from_node(lcurly);
+            !ctx.is_indent_exact(actual, &acceptable)
+        } else {
+            false
+        };
+
+        // Elements should be indented by array_init_indent from the base indent
         // When brace is on its own line, also accept brace_position + array_init_indent
+        // When brace is inline with content, also accept alignment with first element
+        let lcurly_line = self.line_no(ctx, node);
         let element_indent = if lcurly_on_own_line {
             if let Some(lcurly) = &lcurly {
                 let brace_col = ctx.column_from_node(lcurly);
@@ -3224,9 +3271,27 @@ impl Indentation {
                 indent.with_offset(self.array_init_indent)
             }
         } else {
-            indent.with_offset(self.array_init_indent)
+            // Inline brace - find first content element on the opening line for alignment
+            let mut first_element_col: Option<i32> = None;
+            for child in node.children() {
+                match child.kind() {
+                    "{" | "," | "line_comment" | "block_comment" => {}
+                    _ => {
+                        let child_line = self.line_no(ctx, &child);
+                        if child_line == lcurly_line {
+                            first_element_col = Some(ctx.column_from_node(&child));
+                            break;
+                        }
+                    }
+                }
+            }
+            let base = indent.with_offset(self.array_init_indent);
+            if let Some(col) = first_element_col {
+                base.add_acceptable(&[col])
+            } else {
+                base
+            }
         };
-        let lcurly_line = self.line_no(ctx, node);
 
         for child in node.children() {
             match child.kind() {
@@ -3236,17 +3301,36 @@ impl Indentation {
                     let child_line = self.line_no(ctx, &child);
                     if child_line > lcurly_line && ctx.is_on_start_of_line(&child) {
                         let actual = ctx.get_line_start(child_line);
-                        if !ctx.is_indent_acceptable(actual, &element_indent) {
+                        // Use strict checking - nested array initializers must match exactly
+                        if !ctx.is_indent_exact(actual, &element_indent) {
                             ctx.log_child_error(&child, "array initialization", actual, &element_indent);
                         }
                     }
                     self.check_array_initializer(ctx, &child, &element_indent);
                 }
+                "array_creation_expression" => {
+                    // Nested array creation (e.g., new int[] { 1, 2, 3} inside int[][])
+                    // When parent brace is misaligned, use lenient mode
+                    let child_line = self.line_no(ctx, &child);
+                    if child_line > lcurly_line && ctx.is_on_start_of_line(&child) {
+                        let actual = ctx.get_line_start(child_line);
+                        let is_acceptable = if brace_misaligned {
+                            ctx.is_indent_acceptable(actual, &element_indent)
+                        } else {
+                            ctx.is_indent_exact(actual, &element_indent)
+                        };
+                        if !is_acceptable {
+                            ctx.log_child_error(&child, "array initialization", actual, &element_indent);
+                        }
+                    }
+                    self.check_array_creation_expression(ctx, &child, &element_indent);
+                }
                 _ => {
                     let child_line = self.line_no(ctx, &child);
                     if child_line > lcurly_line && ctx.is_on_start_of_line(&child) {
                         let actual = ctx.get_line_start(child_line);
-                        if !ctx.is_indent_acceptable(actual, &element_indent) {
+                        // Use strict checking for regular elements
+                        if !ctx.is_indent_exact(actual, &element_indent) {
                             ctx.log_child_error(&child, "array initialization", actual, &element_indent);
                         }
                     }

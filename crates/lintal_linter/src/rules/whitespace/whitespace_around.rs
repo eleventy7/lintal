@@ -34,6 +34,38 @@ pub struct WhitespaceAround {
     pub check_wildcard_type: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "binary_expression",
+    "assignment_expression",
+    "variable_declarator",
+    "ternary_expression",
+    "if_statement",
+    "while_statement",
+    "do_statement",
+    "for_statement",
+    "enhanced_for_statement",
+    "switch_expression",
+    "switch_statement",
+    "synchronized_statement",
+    "try_statement",
+    "try_with_resources_statement",
+    "catch_clause",
+    "finally_clause",
+    "return_statement",
+    "assert_statement",
+    "block",
+    "constructor_body",
+    "class_body",
+    "interface_body",
+    "enum_body",
+    "annotation_type_body",
+    "lambda_expression",
+    "type_bound",
+    "guard",
+    "type_arguments",
+    "wildcard",
+];
+
 impl Default for WhitespaceAround {
     fn default() -> Self {
         Self {
@@ -129,6 +161,10 @@ impl Violation for MissingWhitespaceAfter {
 impl Rule for WhitespaceAround {
     fn name(&self) -> &'static str {
         "WhitespaceAround"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

@@ -98,6 +98,33 @@ pub struct ParenPad {
     pub tokens: HashSet<ParenPadToken>,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "parenthesized_expression",
+    "method_invocation",
+    "method_declaration",
+    "constructor_declaration",
+    "if_statement",
+    "while_statement",
+    "for_statement",
+    "enhanced_for_statement",
+    "do_statement",
+    "switch_expression",
+    "switch_statement",
+    "synchronized_statement",
+    "catch_clause",
+    "object_creation_expression",
+    "explicit_constructor_invocation",
+    "ternary_expression",
+    "try_with_resources_statement",
+    "lambda_expression",
+    "record_declaration",
+    "compact_constructor_declaration",
+    "annotation",
+    "marker_annotation",
+    "annotation_type_declaration",
+    "enum_constant",
+];
+
 impl Default for ParenPad {
     fn default() -> Self {
         let mut tokens = HashSet::new();
@@ -165,6 +192,10 @@ impl FromConfig for ParenPad {
 impl Rule for ParenPad {
     fn name(&self) -> &'static str {
         "ParenPad"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

@@ -15,6 +15,14 @@ pub struct NeedBraces {
     pub allow_empty_loop_body: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "if_statement",
+    "while_statement",
+    "do_statement",
+    "for_statement",
+    "enhanced_for_statement",
+];
+
 impl FromConfig for NeedBraces {
     const MODULE_NAME: &'static str = "NeedBraces";
 
@@ -53,6 +61,10 @@ impl Violation for NeedBracesViolation {
 impl Rule for NeedBraces {
     fn name(&self) -> &'static str {
         "NeedBraces"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

@@ -62,6 +62,11 @@ pub trait Rule: Send + Sync {
     /// The rule's name (matching checkstyle module name).
     fn name(&self) -> &'static str;
 
+    /// Node kinds this rule cares about. Empty means run on all nodes.
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     /// Check a CST node for violations.
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic>;
 }

@@ -40,6 +40,8 @@ pub struct EmptyForInitializerPad {
     pub option: PadOption,
 }
 
+const RELEVANT_KINDS: &[&str] = &["for_statement"];
+
 impl Default for EmptyForInitializerPad {
     fn default() -> Self {
         Self {
@@ -64,6 +66,10 @@ impl FromConfig for EmptyForInitializerPad {
 impl Rule for EmptyForInitializerPad {
     fn name(&self) -> &'static str {
         "EmptyForInitializerPad"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

@@ -12,6 +12,8 @@ use crate::{CheckContext, FromConfig, Properties, Rule};
 #[derive(Debug, Clone)]
 pub struct ModifierOrder;
 
+const RELEVANT_KINDS: &[&str] = &["modifiers"];
+
 impl Default for ModifierOrder {
     fn default() -> Self {
         Self
@@ -65,6 +67,10 @@ impl Violation for AnnotationMustPrecedeModifiers {
 impl Rule for ModifierOrder {
     fn name(&self) -> &'static str {
         "ModifierOrder"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

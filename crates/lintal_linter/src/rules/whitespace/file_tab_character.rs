@@ -44,6 +44,8 @@ pub struct FileTabCharacter {
     pub tab_width: usize,
 }
 
+const RELEVANT_KINDS: &[&str] = &["program"];
+
 impl Default for FileTabCharacter {
     fn default() -> Self {
         Self {
@@ -77,6 +79,10 @@ impl FromConfig for FileTabCharacter {
 impl Rule for FileTabCharacter {
     fn name(&self) -> &'static str {
         "FileTabCharacter"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

@@ -16,6 +16,25 @@ pub struct RedundantModifier {
     jdk_version: u32,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "interface_declaration",
+    "annotation_type_declaration",
+    "field_declaration",
+    "constant_declaration",
+    "method_declaration",
+    "annotation_type_element_declaration",
+    "class_declaration",
+    "enum_declaration",
+    "record_declaration",
+    "constructor_declaration",
+    "try_with_resources_statement",
+    "formal_parameter",
+    "local_variable_declaration",
+    "instanceof_expression",
+    "catch_formal_parameter",
+    "switch_rule",
+];
+
 impl Default for RedundantModifier {
     fn default() -> Self {
         Self { jdk_version: 22 }
@@ -61,6 +80,10 @@ impl Violation for RedundantModifierViolation {
 impl Rule for RedundantModifier {
     fn name(&self) -> &'static str {
         "RedundantModifier"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

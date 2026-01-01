@@ -94,9 +94,15 @@ impl FromConfig for Indentation {
     }
 }
 
+const RELEVANT_KINDS: &[&str] = &["program"];
+
 impl Rule for Indentation {
     fn name(&self) -> &'static str {
         "Indentation"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

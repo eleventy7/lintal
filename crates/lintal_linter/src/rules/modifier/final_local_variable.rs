@@ -14,6 +14,14 @@ pub struct FinalLocalVariable {
     validate_unnamed_variables: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "method_declaration",
+    "constructor_declaration",
+    "static_initializer",
+    "block",
+    "lambda_expression",
+];
+
 /// Violation for a variable that should be final.
 #[derive(Debug, Clone)]
 pub struct VariableShouldBeFinal {
@@ -1052,6 +1060,10 @@ impl<'a> FinalLocalVariableVisitor<'a> {
 impl Rule for FinalLocalVariable {
     fn name(&self) -> &'static str {
         "FinalLocalVariable"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

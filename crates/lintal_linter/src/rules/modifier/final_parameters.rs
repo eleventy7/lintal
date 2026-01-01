@@ -20,6 +20,13 @@ pub struct FinalParameters {
     ignore_unnamed_parameters: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "method_declaration",
+    "constructor_declaration",
+    "catch_clause",
+    "enhanced_for_statement",
+];
+
 /// Token types that can be checked by FinalParameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FinalParametersToken {
@@ -116,6 +123,10 @@ impl Violation for ParameterShouldBeFinal {
 impl Rule for FinalParameters {
     fn name(&self) -> &'static str {
         "FinalParameters"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

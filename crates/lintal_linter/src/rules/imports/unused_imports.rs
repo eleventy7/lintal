@@ -34,6 +34,8 @@ pub struct UnusedImports {
     pub process_javadoc: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &["program"];
+
 impl Default for UnusedImports {
     fn default() -> Self {
         Self {
@@ -58,6 +60,10 @@ impl FromConfig for UnusedImports {
 impl Rule for UnusedImports {
     fn name(&self) -> &'static str {
         "UnusedImports"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

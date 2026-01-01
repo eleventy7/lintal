@@ -49,6 +49,17 @@ pub struct WhitespaceAfter {
     pub tokens: HashSet<WhitespaceAfterToken>,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    ",",
+    ";",
+    "cast_expression",
+    "if_statement",
+    "while_statement",
+    "do_statement",
+    "for_statement",
+    "enhanced_for_statement",
+];
+
 impl Default for WhitespaceAfter {
     fn default() -> Self {
         let mut tokens = HashSet::new();
@@ -81,6 +92,10 @@ impl FromConfig for WhitespaceAfter {
 impl Rule for WhitespaceAfter {
     fn name(&self) -> &'static str {
         "WhitespaceAfter"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

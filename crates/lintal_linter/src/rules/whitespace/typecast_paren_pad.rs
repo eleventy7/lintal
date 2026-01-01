@@ -35,6 +35,8 @@ pub struct TypecastParenPad {
     pub option: TypecastParenPadOption,
 }
 
+const RELEVANT_KINDS: &[&str] = &["cast_expression"];
+
 impl Default for TypecastParenPad {
     fn default() -> Self {
         Self {
@@ -59,6 +61,10 @@ impl FromConfig for TypecastParenPad {
 impl Rule for TypecastParenPad {
     fn name(&self) -> &'static str {
         "TypecastParenPad"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

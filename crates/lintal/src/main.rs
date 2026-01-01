@@ -6,7 +6,7 @@ use colored::Colorize;
 use lintal_checkstyle::{CheckstyleConfig, ConfiguredRule, LintalConfig, MergedConfig};
 use lintal_diagnostics::{Applicability, Diagnostic, Edit};
 use lintal_java_cst::{CstNode, TreeWalker};
-use lintal_java_parser::JavaParser;
+use lintal_java_parser::{java_kind_id_map, java_language, JavaParser};
 use lintal_linter::{
     CheckContext, FileSuppressionsConfig, PlainTextCommentFilterConfig, Rule, RuleRegistry,
     SuppressionContext,
@@ -21,6 +21,69 @@ use walkdir::WalkDir;
 // Thread-local parser to avoid repeated initialization overhead
 thread_local! {
     static PARSER: RefCell<JavaParser> = RefCell::new(JavaParser::new());
+}
+
+struct DispatchTable {
+    per_kind: Vec<Vec<usize>>,
+    catch_all: Vec<usize>,
+}
+
+impl DispatchTable {
+    fn new(rules: &[Box<dyn Rule>]) -> Self {
+        let language = java_language();
+        let kind_count = language.node_kind_count();
+        let mut per_kind: Vec<Vec<usize>> = vec![Vec::new(); kind_count];
+        let mut catch_all = Vec::new();
+        let kind_map = java_kind_id_map();
+        let mut unknown_kinds: Vec<(&'static str, &'static str)> = Vec::new();
+
+        for (idx, rule) in rules.iter().enumerate() {
+            let kinds = rule.relevant_kinds();
+            if kinds.is_empty() {
+                catch_all.push(idx);
+                continue;
+            }
+
+            for &kind in kinds {
+                if let Some(ids) = kind_map.get(kind) {
+                    for id in ids {
+                        let slot = &mut per_kind[*id as usize];
+                        if !slot.contains(&idx) {
+                            slot.push(idx);
+                        }
+                    }
+                } else {
+                    unknown_kinds.push((rule.name(), kind));
+                }
+            }
+        }
+
+        #[cfg(debug_assertions)]
+        if !unknown_kinds.is_empty() {
+            let mut seen: std::collections::HashSet<(&'static str, &'static str)> =
+                std::collections::HashSet::new();
+            for (rule, kind) in unknown_kinds {
+                if seen.insert((rule, kind)) {
+                    eprintln!(
+                        "Debug: rule '{}' references unknown node kind '{}'",
+                        rule, kind
+                    );
+                }
+            }
+        }
+
+        Self {
+            per_kind,
+            catch_all,
+        }
+    }
+
+    fn rule_indices_for_kind(&self, kind_id: u16) -> impl Iterator<Item = usize> + '_ {
+        self.per_kind[kind_id as usize]
+            .iter()
+            .copied()
+            .chain(self.catch_all.iter().copied())
+    }
 }
 
 /// Result of checking a single file.
@@ -122,6 +185,7 @@ fn run_check(
     // Load configuration
     let (rules, merged_config, suppression_filters, file_suppressions) =
         load_rules(config_path, config_loc, paths)?;
+    let dispatch = DispatchTable::new(&rules);
 
     if rules.is_empty() {
         eprintln!("{}", "Warning: No rules configured".yellow());
@@ -152,7 +216,13 @@ fn run_check(
                 return None;
             }
 
-            let result = check_file(path, &rules, &suppression_filters, &file_suppressions);
+            let result = check_file(
+                path,
+                &rules,
+                &dispatch,
+                &suppression_filters,
+                &file_suppressions,
+            );
             files_processed.fetch_add(1, Ordering::Relaxed);
             result.ok()
         })
@@ -196,6 +266,7 @@ fn run_fix(
 ) -> Result<()> {
     let (rules, merged_config, suppression_filters, file_suppressions) =
         load_rules(config_path, config_loc, paths)?;
+    let dispatch = DispatchTable::new(&rules);
 
     if rules.is_empty() {
         eprintln!("{}", "Warning: No rules configured".yellow());
@@ -233,6 +304,7 @@ fn run_fix(
             fix_file(
                 path,
                 &rules,
+                &dispatch,
                 &suppression_filters,
                 &file_suppressions,
                 applicability,
@@ -288,6 +360,7 @@ fn run_fix(
 fn fix_file(
     path: &PathBuf,
     rules: &[Box<dyn Rule>],
+    dispatch: &DispatchTable,
     suppression_filters: &[PlainTextCommentFilterConfig],
     file_suppressions: &FileSuppressionsConfig,
     applicability: Applicability,
@@ -317,19 +390,36 @@ fn fix_file(
     let path_str = path.to_string_lossy();
 
     // Cache which rules are suppressed for this file (check once, not per-node)
-    let unsuppressed_rules: Vec<_> = rules
-        .iter()
-        .filter(|rule| !file_suppressions.is_suppressed(&path_str, rule.name()))
-        .collect();
+    let suppressed_rules: Option<Vec<bool>> = if file_suppressions.is_empty() {
+        None
+    } else {
+        Some(
+            rules
+                .iter()
+                .map(|rule| file_suppressions.is_suppressed(&path_str, rule.name()))
+                .collect(),
+        )
+    };
 
     // Collect all diagnostics, filtering out suppressed ones
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let has_suppressions = suppression_ctx.has_suppressions();
     for node in TreeWalker::new(root.inner(), &source) {
-        for rule in &unsuppressed_rules {
+        for rule_idx in dispatch.rule_indices_for_kind(node.kind_id()) {
+            if suppressed_rules
+                .as_ref()
+                .is_some_and(|mask| mask[rule_idx])
+            {
+                continue;
+            }
+            let rule = &rules[rule_idx];
             for diagnostic in rule.check(&ctx, &node) {
-                if !suppression_ctx.is_suppressed(rule.name(), diagnostic.range.start()) {
-                    diagnostics.push(diagnostic);
+                if has_suppressions
+                    && suppression_ctx.is_suppressed(rule.name(), diagnostic.range.start())
+                {
+                    continue;
                 }
+                diagnostics.push(diagnostic);
             }
         }
     }
@@ -807,6 +897,7 @@ fn collect_java_files(paths: &[PathBuf]) -> Vec<PathBuf> {
 fn check_file(
     path: &PathBuf,
     rules: &[Box<dyn Rule>],
+    dispatch: &DispatchTable,
     suppression_filters: &[PlainTextCommentFilterConfig],
     file_suppressions: &FileSuppressionsConfig,
 ) -> Result<FileCheckResult> {
@@ -837,17 +928,32 @@ fn check_file(
     let path_str = path.to_string_lossy();
 
     // Cache which rules are suppressed for this file (check once, not per-node)
-    let unsuppressed_rules: Vec<_> = rules
-        .iter()
-        .filter(|rule| !file_suppressions.is_suppressed(&path_str, rule.name()))
-        .collect();
+    let suppressed_rules: Option<Vec<bool>> = if file_suppressions.is_empty() {
+        None
+    } else {
+        Some(
+            rules
+                .iter()
+                .map(|rule| file_suppressions.is_suppressed(&path_str, rule.name()))
+                .collect(),
+        )
+    };
 
+    let has_suppressions = suppression_ctx.has_suppressions();
     for node in TreeWalker::new(root.inner(), &source) {
-        for rule in &unsuppressed_rules {
-            let diagnostics = rule.check(&ctx, &node);
-            for diagnostic in diagnostics {
+        for rule_idx in dispatch.rule_indices_for_kind(node.kind_id()) {
+            if suppressed_rules
+                .as_ref()
+                .is_some_and(|mask| mask[rule_idx])
+            {
+                continue;
+            }
+            let rule = &rules[rule_idx];
+            for diagnostic in rule.check(&ctx, &node) {
                 // Skip suppressed diagnostics (comment-based and @SuppressWarnings)
-                if suppression_ctx.is_suppressed(rule.name(), diagnostic.range.start()) {
+                if has_suppressions
+                    && suppression_ctx.is_suppressed(rule.name(), diagnostic.range.start())
+                {
                     continue;
                 }
 

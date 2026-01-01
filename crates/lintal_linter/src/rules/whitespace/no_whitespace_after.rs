@@ -62,6 +62,24 @@ pub struct NoWhitespaceAfter {
     pub allow_line_breaks: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "{",
+    "@",
+    "++",
+    "--",
+    "-",
+    "+",
+    "~",
+    "!",
+    ".",
+    "dimensions",
+    "dimensions_expr",
+    "array_access",
+    "cast_expression",
+    "synchronized_statement",
+    "::",
+];
+
 impl Default for NoWhitespaceAfter {
     fn default() -> Self {
         let mut tokens = HashSet::new();
@@ -116,6 +134,10 @@ impl FromConfig for NoWhitespaceAfter {
 impl Rule for NoWhitespaceAfter {
     fn name(&self) -> &'static str {
         "NoWhitespaceAfter"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

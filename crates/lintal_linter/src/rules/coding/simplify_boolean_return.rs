@@ -25,6 +25,8 @@ impl Violation for SimplifyBooleanReturnViolation {
 #[derive(Debug, Clone, Default)]
 pub struct SimplifyBooleanReturn;
 
+const RELEVANT_KINDS: &[&str] = &["if_statement"];
+
 impl FromConfig for SimplifyBooleanReturn {
     const MODULE_NAME: &'static str = "SimplifyBooleanReturn";
 
@@ -36,6 +38,10 @@ impl FromConfig for SimplifyBooleanReturn {
 impl Rule for SimplifyBooleanReturn {
     fn name(&self) -> &'static str {
         "SimplifyBooleanReturn"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

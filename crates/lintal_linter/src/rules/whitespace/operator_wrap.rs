@@ -53,6 +53,8 @@ pub struct OperatorWrap {
     pub option: WrapOption,
 }
 
+const RELEVANT_KINDS: &[&str] = &["binary_expression"];
+
 impl Default for OperatorWrap {
     fn default() -> Self {
         Self {
@@ -80,6 +82,10 @@ impl FromConfig for OperatorWrap {
 impl Rule for OperatorWrap {
     fn name(&self) -> &'static str {
         "OperatorWrap"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

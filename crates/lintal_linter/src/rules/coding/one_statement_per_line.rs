@@ -28,6 +28,8 @@ pub struct OneStatementPerLine {
     pub treat_try_resources_as_statement: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &["block", "class_body"];
+
 impl FromConfig for OneStatementPerLine {
     const MODULE_NAME: &'static str = "OneStatementPerLine";
 
@@ -46,6 +48,10 @@ impl FromConfig for OneStatementPerLine {
 impl Rule for OneStatementPerLine {
     fn name(&self) -> &'static str {
         "OneStatementPerLine"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

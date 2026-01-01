@@ -112,6 +112,16 @@ pub struct MethodParamPad {
     pub tokens: HashSet<MethodParamPadToken>,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "method_declaration",
+    "constructor_declaration",
+    "method_invocation",
+    "object_creation_expression",
+    "explicit_constructor_invocation",
+    "enum_constant",
+    "record_declaration",
+];
+
 impl Default for MethodParamPad {
     fn default() -> Self {
         let mut tokens = HashSet::new();
@@ -170,6 +180,10 @@ impl FromConfig for MethodParamPad {
 impl Rule for MethodParamPad {
     fn name(&self) -> &'static str {
         "MethodParamPad"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

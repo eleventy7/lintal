@@ -86,6 +86,27 @@ pub struct RightCurly {
     pub tokens: HashSet<RightCurlyToken>,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "if_statement",
+    "try_statement",
+    "try_with_resources_statement",
+    "catch_clause",
+    "finally_clause",
+    "enum_declaration",
+    "class_declaration",
+    "interface_declaration",
+    "annotation_type_declaration",
+    "record_declaration",
+    "method_declaration",
+    "constructor_declaration",
+    "static_initializer",
+    "while_statement",
+    "for_statement",
+    "enhanced_for_statement",
+    "do_statement",
+    "switch_expression",
+];
+
 struct BraceLineInfo {
     line_start: TextSize,
     line_end: TextSize,
@@ -196,6 +217,10 @@ impl Violation for RightCurlyShouldHaveLineBreakBefore {
 impl Rule for RightCurly {
     fn name(&self) -> &'static str {
         "RightCurly"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

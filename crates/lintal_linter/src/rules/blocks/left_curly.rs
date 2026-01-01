@@ -30,6 +30,31 @@ pub struct LeftCurly {
     pub ignore_enums: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "class_declaration",
+    "interface_declaration",
+    "annotation_type_declaration",
+    "enum_declaration",
+    "record_declaration",
+    "method_declaration",
+    "constructor_declaration",
+    "if_statement",
+    "while_statement",
+    "for_statement",
+    "enhanced_for_statement",
+    "do_statement",
+    "try_statement",
+    "try_with_resources_statement",
+    "catch_clause",
+    "finally_clause",
+    "static_initializer",
+    "lambda_expression",
+    "switch_expression",
+    "switch_statement",
+    "switch_block_statement_group",
+    "enum_constant",
+];
+
 struct BraceLineInfo {
     line: lintal_source_file::OneIndexed,
     line_start: TextSize,
@@ -126,6 +151,10 @@ impl Violation for LeftCurlyShouldHaveLineBreakAfter {
 impl Rule for LeftCurly {
     fn name(&self) -> &'static str {
         "LeftCurly"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

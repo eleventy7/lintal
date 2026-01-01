@@ -54,6 +54,8 @@ pub struct NoWhitespaceBefore {
     pub allow_line_breaks: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[",", ";", "++", "--", "...", ":", ".", "::", "<", ">"];
+
 impl Default for NoWhitespaceBefore {
     fn default() -> Self {
         let mut tokens = HashSet::new();
@@ -103,6 +105,10 @@ impl FromConfig for NoWhitespaceBefore {
 impl Rule for NoWhitespaceBefore {
     fn name(&self) -> &'static str {
         "NoWhitespaceBefore"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

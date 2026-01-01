@@ -54,6 +54,10 @@ impl<'a> CstNode<'a> {
         self.node.kind()
     }
 
+    pub fn kind_id(&self) -> u16 {
+        self.node.kind_id()
+    }
+
     pub fn range(&self) -> TextRange {
         node_range(&self.node)
     }

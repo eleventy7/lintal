@@ -60,6 +60,8 @@ impl Violation for DuplicateImport {
 #[derive(Debug, Clone, Default)]
 pub struct RedundantImport;
 
+const RELEVANT_KINDS: &[&str] = &["program"];
+
 impl FromConfig for RedundantImport {
     const MODULE_NAME: &'static str = "RedundantImport";
 
@@ -71,6 +73,10 @@ impl FromConfig for RedundantImport {
 impl Rule for RedundantImport {
     fn name(&self) -> &'static str {
         "RedundantImport"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

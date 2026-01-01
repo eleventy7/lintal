@@ -125,6 +125,8 @@ pub struct EmptyLineSeparator {
     pub tokens: HashSet<EmptyLineSeparatorToken>,
 }
 
+const RELEVANT_KINDS: &[&str] = &["class_body", "interface_body", "enum_body"];
+
 impl Default for EmptyLineSeparator {
     fn default() -> Self {
         Self {
@@ -176,6 +178,10 @@ impl FromConfig for EmptyLineSeparator {
 impl Rule for EmptyLineSeparator {
     fn name(&self) -> &'static str {
         "EmptyLineSeparator"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

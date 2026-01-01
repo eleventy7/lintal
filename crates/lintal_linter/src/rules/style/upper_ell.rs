@@ -36,6 +36,13 @@ impl Violation for UpperEllViolation {
 #[derive(Debug, Clone, Default)]
 pub struct UpperEll;
 
+const RELEVANT_KINDS: &[&str] = &[
+    "decimal_integer_literal",
+    "hex_integer_literal",
+    "octal_integer_literal",
+    "binary_integer_literal",
+];
+
 impl FromConfig for UpperEll {
     const MODULE_NAME: &'static str = "UpperEll";
 
@@ -47,6 +54,10 @@ impl FromConfig for UpperEll {
 impl Rule for UpperEll {
     fn name(&self) -> &'static str {
         "UpperEll"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

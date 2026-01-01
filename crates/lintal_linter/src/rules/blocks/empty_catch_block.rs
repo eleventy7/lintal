@@ -16,6 +16,8 @@ pub struct EmptyCatchBlock {
     pub comment_format: Regex,
 }
 
+const RELEVANT_KINDS: &[&str] = &["catch_clause"];
+
 impl Default for EmptyCatchBlock {
     fn default() -> Self {
         Self {
@@ -63,6 +65,10 @@ impl Violation for EmptyCatchBlockViolation {
 impl Rule for EmptyCatchBlock {
     fn name(&self) -> &'static str {
         "EmptyCatchBlock"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

@@ -47,6 +47,12 @@ pub struct ArrayTypeStyle {
     pub java_style: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "method_declaration",
+    "variable_declarator",
+    "formal_parameter",
+];
+
 impl Default for ArrayTypeStyle {
     fn default() -> Self {
         Self { java_style: true }
@@ -69,6 +75,10 @@ impl FromConfig for ArrayTypeStyle {
 impl Rule for ArrayTypeStyle {
     fn name(&self) -> &'static str {
         "ArrayTypeStyle"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

@@ -37,6 +37,13 @@ impl Violation for MultipleOnLineViolation {
 #[derive(Debug, Clone, Default)]
 pub struct MultipleVariableDeclarations;
 
+const RELEVANT_KINDS: &[&str] = &[
+    "local_variable_declaration",
+    "field_declaration",
+    "block",
+    "class_body",
+];
+
 impl FromConfig for MultipleVariableDeclarations {
     const MODULE_NAME: &'static str = "MultipleVariableDeclarations";
 
@@ -48,6 +55,10 @@ impl FromConfig for MultipleVariableDeclarations {
 impl Rule for MultipleVariableDeclarations {
     fn name(&self) -> &'static str {
         "MultipleVariableDeclarations"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

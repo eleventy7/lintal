@@ -25,6 +25,22 @@ pub struct EmptyBlock {
     pub option: BlockOption,
 }
 
+const RELEVANT_KINDS: &[&str] = &[
+    "while_statement",
+    "try_statement",
+    "finally",
+    "do_statement",
+    "if_statement",
+    "for_statement",
+    "enhanced_for_statement",
+    "switch_expression",
+    "synchronized_statement",
+    "static_initializer",
+    "block",
+    "switch_block_statement_group",
+    "switch_rule",
+];
+
 impl FromConfig for EmptyBlock {
     const MODULE_NAME: &'static str = "EmptyBlock";
 
@@ -74,6 +90,10 @@ impl Violation for EmptyBlockNoText {
 impl Rule for EmptyBlock {
     fn name(&self) -> &'static str {
         "EmptyBlock"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

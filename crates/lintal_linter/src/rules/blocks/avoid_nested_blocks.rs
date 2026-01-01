@@ -16,6 +16,8 @@ pub struct AvoidNestedBlocks {
     pub allow_in_switch_case: bool,
 }
 
+const RELEVANT_KINDS: &[&str] = &["block"];
+
 impl FromConfig for AvoidNestedBlocks {
     const MODULE_NAME: &'static str = "AvoidNestedBlocks";
 
@@ -46,6 +48,10 @@ impl Violation for NestedBlock {
 impl Rule for AvoidNestedBlocks {
     fn name(&self) -> &'static str {
         "AvoidNestedBlocks"
+    }
+
+    fn relevant_kinds(&self) -> &'static [&'static str] {
+        RELEVANT_KINDS
     }
 
     fn check(&self, _ctx: &CheckContext, node: &CstNode) -> Vec<Diagnostic> {

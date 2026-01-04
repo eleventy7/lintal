@@ -1,0 +1,33 @@
+# Docker Compose for ISOLATED Claude Code development
+# Uses a git worktree instead of mounting the main checkout
+#
+# Setup:
+#   ./docker/scripts/create-worktree.sh [branch-name]
+#   ./docker/start-isolated.sh
+#
+# Or manually:
+#   WORKTREE_PATH=/path/to/worktree docker compose -f docker/docker-compose.worktree.yml up -d
+
+services:
+  lintal-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lintal-claude-dev-isolated
+    ports:
+      - "2222:22"
+    volumes:
+      # Mount the WORKTREE, not the main checkout
+      # This isolates the main repo from any damage
+      - ${WORKTREE_PATH:-../lintal-claude-worktree}:/home/developer/workspace/lintal
+      # Patches directory for exporting changes
+      - lintal-patches:/home/developer/patches
+      # Mount host's Claude config for settings/plugins
+      - ~/.claude:/home/developer/.claude
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  lintal-patches:
+    driver: local

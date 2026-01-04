@@ -1,0 +1,37 @@
+# Docker Compose for Claude Code development environment
+# Usage:
+#   docker compose -f docker/docker-compose.yml up -d
+#   ssh -p 2222 developer@localhost (password: developer)
+#
+# Authentication options (choose one):
+#   1. API Key: export ANTHROPIC_API_KEY=sk-ant-...
+#   2. Claude Max token: ./docker/scripts/get-claude-token.sh > docker/.claude-token
+#      Then mount it (uncomment the .claude-token volume below)
+
+services:
+  lintal-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lintal-claude-dev
+    ports:
+      - "2222:22"
+    volumes:
+      # Mount the lintal source code (read-write for Claude to work on)
+      - ..:/home/developer/workspace/lintal
+      # Separate volume for patches to export to host
+      - lintal-patches:/home/developer/patches
+      # Mount host's Claude config (includes settings, plugins, etc.)
+      - ~/.claude:/home/developer/.claude
+      # Optional: Mount SSH keys for git authentication
+      # - ~/.ssh/id_ed25519:/home/developer/.ssh/id_ed25519:ro
+    environment:
+      # For API key auth:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # For Claude Max - token extracted from keychain:
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+    restart: unless-stopped
+
+volumes:
+  lintal-patches:
+    driver: local

@@ -1,0 +1,20 @@
+# Build artifacts
+target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+
+# Test repos (cloned during testing)
+target/aeron/
+target/artio/
+target/agrona/
+target/checkstyle-tests/
+
+# Patches
+patches/

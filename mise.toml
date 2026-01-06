@@ -50,19 +50,41 @@ depends = ["build", "clone-test-repos", "download-checkstyle"]
 run = "uv run python scripts/benchmark.py"
 
 [tasks.release]
-description = "Tag and push a release (usage: mise run release 0.1.1)"
+description = "Tag and push a release (usage: mise run release 0.1.6)"
 run = """
 #!/bin/bash
 set -e
 VERSION="${1:?Usage: mise run release <version>}"
-echo "Building release to verify..."
+
+echo "Updating crate versions to $VERSION..."
+for cargo_toml in crates/*/Cargo.toml; do
+    sed -i '' "s/^version = \"[0-9]*\\.[0-9]*\\.[0-9]*\"/version = \"$VERSION\"/" "$cargo_toml"
+    echo "  Updated $cargo_toml"
+done
+
+echo "Running cargo check to verify versions..."
+cargo check --all
+
+echo "Running fmt and clippy..."
+cargo fmt --all
+cargo clippy --all-targets --all-features -- -D warnings
+
+echo "Building release..."
 cargo build --release
-echo "Committing any pending changes..."
-git add -A && git commit -m "Release v$VERSION" --allow-empty
+
+echo "Committing version bump..."
+git add -A
+git commit -m "Release v$VERSION"
+
+echo "Pushing commit to remote..."
+git push
+
 echo "Tagging v$VERSION..."
 git tag "v$VERSION"
-echo "Pushing to remote..."
-git push && git push --tags
+
+echo "Pushing tag..."
+git push --tags
+
 echo ""
 echo "Release v$VERSION pushed!"
 echo "Watch the build: https://github.com/eleventy7/lintal/actions"

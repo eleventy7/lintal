@@ -19,8 +19,12 @@ cargo test --all
 # Run specific test suite (checkstyle compatibility tests)
 cargo test --package lintal_linter --test checkstyle_finallocalvariable
 
-# Lint and format
+# Lint and format (run before committing)
 cargo fmt --all
+cargo clippy --all-targets --all-features -- -D warnings
+
+# CI checks (these must pass)
+cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 
 # Run on a Java project

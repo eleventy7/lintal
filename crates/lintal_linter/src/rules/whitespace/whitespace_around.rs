@@ -665,9 +665,7 @@ fn is_empty_block(node: &CstNode) -> bool {
     let second = iter.next();
     let third = iter.next();
 
-    first.map(|c| c.kind()) == Some("{")
-        && second.map(|c| c.kind()) == Some("}")
-        && third.is_none()
+    first.map(|c| c.kind()) == Some("{") && second.map(|c| c.kind()) == Some("}") && third.is_none()
 }
 
 /// Check if a type body is empty.
@@ -678,9 +676,7 @@ fn is_empty_type_body(node: &CstNode) -> bool {
     let second = iter.next();
     let third = iter.next();
 
-    first.map(|c| c.kind()) == Some("{")
-        && second.map(|c| c.kind()) == Some("}")
-        && third.is_none()
+    first.map(|c| c.kind()) == Some("{") && second.map(|c| c.kind()) == Some("}") && third.is_none()
 }
 
 /// Find the operator node in a binary expression.

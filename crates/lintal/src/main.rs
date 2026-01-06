@@ -6,7 +6,7 @@ use colored::Colorize;
 use lintal_checkstyle::{CheckstyleConfig, ConfiguredRule, LintalConfig, MergedConfig};
 use lintal_diagnostics::{Applicability, Diagnostic, Edit};
 use lintal_java_cst::{CstNode, TreeWalker};
-use lintal_java_parser::{java_kind_id_map, java_language, JavaParser};
+use lintal_java_parser::{JavaParser, java_kind_id_map, java_language};
 use lintal_linter::{
     CheckContext, FileSuppressionsConfig, PlainTextCommentFilterConfig, Rule, RuleRegistry,
     SuppressionContext,
@@ -427,10 +427,7 @@ fn fix_file(
             continue;
         }
         for rule_idx in dispatch.rule_indices_for_kind(kind_id) {
-            if suppressed_rules
-                .as_ref()
-                .is_some_and(|mask| mask[rule_idx])
-            {
+            if suppressed_rules.as_ref().is_some_and(|mask| mask[rule_idx]) {
                 continue;
             }
             let rule = &rules[rule_idx];
@@ -968,10 +965,7 @@ fn check_file(
             continue;
         }
         for rule_idx in dispatch.rule_indices_for_kind(kind_id) {
-            if suppressed_rules
-                .as_ref()
-                .is_some_and(|mask| mask[rule_idx])
-            {
+            if suppressed_rules.as_ref().is_some_and(|mask| mask[rule_idx]) {
                 continue;
             }
             let rule = &rules[rule_idx];

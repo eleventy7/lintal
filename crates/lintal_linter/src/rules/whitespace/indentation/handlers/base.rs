@@ -77,13 +77,19 @@ impl<'a> HandlerContext<'a> {
         let lines: Vec<&str> = source.lines().collect();
 
         // Precompute line start offsets for O(log n) line number lookup
+        // Must handle both LF (\n) and CRLF (\r\n) line endings
         let mut line_offsets = Vec::with_capacity(lines.len() + 1);
-        let mut offset = 0;
-        for line in &lines {
-            line_offsets.push(offset);
-            offset += line.len() + 1; // +1 for newline
+        line_offsets.push(0); // First line always starts at 0
+
+        let bytes = source.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'\n' {
+                // Start of next line is byte after the \n
+                line_offsets.push(i + 1);
+            }
+            i += 1;
         }
-        line_offsets.push(offset); // sentinel for end of file
 
         Self {
             source,
@@ -236,7 +242,7 @@ impl<'a> HandlerContext<'a> {
         let offset = usize::from(offset);
         // Binary search to find the line containing this offset
         match self.line_offsets.binary_search(&offset) {
-            Ok(line) => line, // Exact match - offset is at start of line
+            Ok(line) => line,                    // Exact match - offset is at start of line
             Err(line) => line.saturating_sub(1), // In the middle of a line
         }
     }
@@ -417,5 +423,56 @@ mod tests {
         assert_eq!(ctx.get_line_start(0), 0);
         assert_eq!(ctx.get_line_start(1), 4);
         assert_eq!(ctx.get_line_start(2), 0);
+    }
+
+    #[test]
+    fn test_multiline_crlf() {
+        // Test CRLF line endings (Windows-style)
+        let source = "class Foo {\r\n    int x;\r\n}";
+        let config = create_test_config();
+        let ctx = HandlerContext::new(source, &config, 4);
+
+        assert_eq!(ctx.get_line_start(0), 0);
+        assert_eq!(ctx.get_line_start(1), 4);
+        assert_eq!(ctx.get_line_start(2), 0);
+    }
+
+    #[test]
+    fn test_line_offsets_crlf() {
+        // Verify line number lookup works correctly with CRLF
+        // Line 0: "class Foo {" (11 chars) + CRLF = bytes 0-12
+        // Line 1: "    int x;" (10 chars) + CRLF = bytes 13-24
+        // Line 2: "}" (1 char) = bytes 25-25
+        let source = "class Foo {\r\n    int x;\r\n}";
+        let config = create_test_config();
+        let ctx = HandlerContext::new(source, &config, 4);
+
+        // Byte offset 0 is start of line 0
+        assert_eq!(ctx.line_no_from_offset(TextSize::new(0)), 0);
+        // Byte offset 5 is still line 0
+        assert_eq!(ctx.line_no_from_offset(TextSize::new(5)), 0);
+        // Byte offset 13 is start of line 1 (after "class Foo {\r\n")
+        assert_eq!(ctx.line_no_from_offset(TextSize::new(13)), 1);
+        // Byte offset 17 is still line 1
+        assert_eq!(ctx.line_no_from_offset(TextSize::new(17)), 1);
+        // Byte offset 25 is start of line 2
+        assert_eq!(ctx.line_no_from_offset(TextSize::new(25)), 2);
+    }
+
+    #[test]
+    fn test_many_lines_crlf() {
+        // Simulate the artio test file scenario - many CRLF lines
+        // Without correct CRLF handling, offsets drift by 1 byte per line
+        let mut source = String::new();
+        for i in 0..130 {
+            source.push_str(&format!("line{}\r\n", i));
+        }
+        source.push_str("    final_line");
+
+        let config = create_test_config();
+        let ctx = HandlerContext::new(&source, &config, 4);
+
+        // Line 130 should have indentation 4
+        assert_eq!(ctx.get_line_start(130), 4);
     }
 }

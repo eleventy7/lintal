@@ -1,11 +1,7 @@
 public class Input
+extends Object
 {
-    public void shortMethod() {
-        System.out.println("short");
-    }
-
-    public void methodWithVeryLongNameThatExceedsTheLineLimit()
-    {
-        System.out.println("long");
+    public void method() {
+        System.out.println("test");
     }
 }

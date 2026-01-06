@@ -169,6 +169,9 @@ fn test_fixture(fixture: &Fixture) -> Result<(), String> {
 #[test]
 fn test_autofix_roundtrip() {
     if !javac_available() {
+        if std::env::var("CI").is_ok() {
+            panic!("javac not found in CI environment - Java setup may be missing");
+        }
         eprintln!("Skipping autofix roundtrip test: javac not found in PATH");
         return;
     }
@@ -176,6 +179,9 @@ fn test_autofix_roundtrip() {
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/autofix");
 
     if !fixtures_dir.exists() {
+        if std::env::var("CI").is_ok() {
+            panic!("Fixtures directory not found in CI: {:?}", fixtures_dir);
+        }
         eprintln!(
             "Skipping autofix roundtrip test: fixtures directory not found at {:?}",
             fixtures_dir

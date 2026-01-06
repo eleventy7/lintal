@@ -106,6 +106,22 @@ fn test_fixture(fixture: &Fixture) -> Result<(), String> {
         ));
     }
 
+    // Safety check: Input.java must differ from Expected.java
+    // If they're identical, the fixture isn't testing anything
+    if let Some(expected_path) = &fixture.expected_java {
+        let input_content = fs::read_to_string(&fixture.input_java)
+            .map_err(|e| format!("Failed to read Input.java: {}", e))?;
+        let expected_content = fs::read_to_string(expected_path)
+            .map_err(|e| format!("Failed to read Expected.java: {}", e))?;
+
+        if input_content == expected_content {
+            return Err(
+                "Input.java and Expected.java are identical - fixture has no violations to fix"
+                    .to_string(),
+            );
+        }
+    }
+
     // Create temp directory and copy the input file
     let temp_dir = TempDir::new().map_err(|e| format!("Failed to create temp dir: {}", e))?;
     let test_file = temp_dir.path().join("Input.java");

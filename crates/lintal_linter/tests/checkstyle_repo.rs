@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;
 
-/// Pinned checkstyle commit (release checkstyle-12.3.0)
-const CHECKSTYLE_COMMIT: &str = "7cd24ce03ffa97cf30b565a536d537fd89a84e6c";
+/// Pinned checkstyle commit (release checkstyle-13.0.0)
+const CHECKSTYLE_COMMIT: &str = "d02376e3756e37285ddf23957d157fffe2a0f2f5";
 const CHECKSTYLE_REPO: &str = "https://github.com/checkstyle/checkstyle.git";
 
 static INIT: Once = Once::new();

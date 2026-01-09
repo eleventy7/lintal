@@ -20,7 +20,7 @@ REPOS = [
 
 PROJECT_ROOT = Path(__file__).parent.parent
 LINTAL_BIN = PROJECT_ROOT / "target/release/lintal"
-CHECKSTYLE_JAR = PROJECT_ROOT / "target/checkstyle-12.3.0-all.jar"
+CHECKSTYLE_JAR = PROJECT_ROOT / "target/checkstyle-13.0.0-all.jar"
 
 
 @dataclass

@@ -41,7 +41,7 @@ mkdir -p target
 description = "Download checkstyle jar for benchmarking"
 run = """
 mkdir -p target
-[ -f target/checkstyle-12.3.0-all.jar ] || curl -L -o target/checkstyle-12.3.0-all.jar https://github.com/checkstyle/checkstyle/releases/download/checkstyle-12.3.0/checkstyle-12.3.0-all.jar
+[ -f target/checkstyle-13.0.0-all.jar ] || curl -L -o target/checkstyle-13.0.0-all.jar https://github.com/checkstyle/checkstyle/releases/download/checkstyle-13.0.0/checkstyle-13.0.0-all.jar
 """
 
 [tasks.benchmark]

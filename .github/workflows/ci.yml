@@ -73,7 +73,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target/checkstyle-tests
-          key: checkstyle-12.3.0-${{ hashFiles('crates/lintal_linter/tests/checkstyle_repo.rs') }}
+          key: checkstyle-13.0.0-${{ hashFiles('crates/lintal_linter/tests/checkstyle_repo.rs') }}
 
       - name: Run compatibility tests
         run: |

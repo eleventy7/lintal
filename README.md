@@ -26,7 +26,7 @@ Since introducing lintal, we're spending less time on the checkstyle step—givi
 
 lintal is significantly faster than checkstyle due to native compilation and parallel processing (along with the Ruff heritage).
 
-**Benchmark vs Checkstyle 12.3.0** (same files, 24 of 30 supported rules including Indentation, 10 runs each after warmup):
+**Benchmark vs Checkstyle 12.3.0** (same files, 33 of 39 supported rules including Indentation, 10 runs each after warmup):
 
 | Repository | Files | Checkstyle | lintal | Speedup |
 |------------|-------|------------|--------|---------|
@@ -90,7 +90,7 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-lintal currently implements 30 checkstyle rules. We validate against checkstyle's own test fixtures and real-world projects.
+lintal currently implements 39 checkstyle rules. We validate against checkstyle's own test fixtures and real-world projects.
 
 **Status key:**
 - ✓ = Passes all checkstyle test fixtures
@@ -157,6 +157,20 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 | OneStatementPerLine | ✅ | ✓ |
 | MultipleVariableDeclarations | ✅ (partial) | ✓ |
 | SimplifyBooleanReturn | ❌ | ✓ |
+
+### Naming (9 rules)
+
+| Rule | Auto-fix | Status |
+|------|----------|--------|
+| ConstantName | ❌ | ✓ |
+| TypeName | ❌ | ✓ |
+| MethodName | ❌ | ✓ |
+| MemberName | ❌ | ✓ |
+| ParameterName | ❌ | ✓ |
+| LocalVariableName | ❌ | ✓ |
+| LocalFinalVariableName | ❌ | ✓ |
+| StaticVariableName | ❌ | ✓ |
+| PackageName | ❌ | ✓ |
 
 ## Development
 

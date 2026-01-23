@@ -20,7 +20,7 @@ lintal_text_size = { path = "../lintal_text_size" }
 lintal_source_file = { path = "../lintal_source_file" }
 
 clap = { version = "4.5", features = ["derive"] }
-colored = "3.0"
+colored = "3.1"
 walkdir = "2.5"
 anyhow = "1.0"
 rayon.workspace = true

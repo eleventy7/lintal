@@ -61,10 +61,14 @@ crates/
 
 ### Adding a New Rule
 
+See [docs/implementing-checks.md](docs/implementing-checks.md) for a comprehensive guide.
+
+Quick summary:
 1. Create rule file in appropriate `crates/lintal_linter/src/rules/<category>/`
 2. Implement `Rule` trait with `name()` and `check()` methods
 3. Register in `crates/lintal_linter/src/registry.rs`
 4. Add checkstyle compatibility tests in `crates/lintal_linter/tests/`
+5. Validate zero false positives against aeron/agrona/artio
 
 ### Rule Implementation
 

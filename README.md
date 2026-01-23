@@ -112,7 +112,7 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 | MethodParamPad | ✅ | ✓ |
 | EmptyForInitializerPad | ✅ | ✓ |
 | FileTabCharacter | ✅ | ✓ |
-| OperatorWrap | ❌ | ✓ |
+| OperatorWrap | ✅ | ✓ |
 | EmptyLineSeparator | ❌ | ✓ |
 | Indentation | ✅ | 89% |
 

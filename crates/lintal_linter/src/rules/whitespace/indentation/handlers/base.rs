@@ -238,7 +238,7 @@ impl<'a> HandlerContext<'a> {
 
     /// Gets the 0-based line number from a byte offset.
     /// Uses binary search on precomputed line offsets for O(log n) performance.
-    fn line_no_from_offset(&self, offset: TextSize) -> usize {
+    pub fn line_no_from_offset(&self, offset: TextSize) -> usize {
         let offset = usize::from(offset);
         // Binary search to find the line containing this offset
         match self.line_offsets.binary_search(&offset) {

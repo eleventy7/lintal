@@ -3717,15 +3717,9 @@ impl Indentation {
     }
 
     /// Get line number from node (0-based).
+    /// Uses binary search on precomputed line offsets for O(log n) performance.
     fn line_no(&self, ctx: &HandlerContext, node: &CstNode) -> usize {
-        let offset = node.range().start();
-        // Count newlines before offset
-        let source = ctx.source();
-        let offset_usize = usize::from(offset);
-        source[..offset_usize.min(source.len())]
-            .chars()
-            .filter(|&c| c == '\n')
-            .count()
+        ctx.line_no_from_offset(node.range().start())
     }
 }
 

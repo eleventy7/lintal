@@ -105,6 +105,9 @@ jobs:
           cargo test --package lintal_linter --test checkstyle_multiplevariabledeclarations
           cargo test --package lintal_linter --test checkstyle_operatorwrap
           cargo test --package lintal_linter --test checkstyle_simplifybooleanreturn
+          cargo test --package lintal_linter --test checkstyle_simplifybooleanexpression
+          cargo test --package lintal_linter --test checkstyle_emptystatement
+          cargo test --package lintal_linter --test checkstyle_finalclass
           cargo test --package lintal_linter --test checkstyle_emptylineseparator
           cargo test --package lintal_linter --test checkstyle_indentation
           cargo test --package lintal_linter --test naming_conventions_progress
@@ -184,5 +187,8 @@ jobs:
       - name: Build lintal
         run: cargo build
 
-      - name: Run autofix roundtrip tests
+      - name: Run autofix roundtrip tests (safe fixes)
         run: cargo test --package lintal_linter --test autofix_roundtrip -- --nocapture
+
+      - name: Run autofix roundtrip tests (unsafe fixes)
+        run: cargo test --package lintal_linter --test autofix_roundtrip_unsafe -- --nocapture

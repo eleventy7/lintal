@@ -50,11 +50,12 @@ impl RuleRegistry {
     fn register_builtins(&mut self) {
         use crate::rules::{
             ArrayTypeStyle, AvoidNestedBlocks, ConstantName, EmptyBlock, EmptyCatchBlock,
-            EmptyForInitializerPad, EmptyLineSeparator, FileTabCharacter, FinalLocalVariable,
-            FinalParameters, Indentation, LeftCurly, LocalFinalVariableName, LocalVariableName,
-            MemberName, MethodName, MethodParamPad, ModifierOrder, MultipleVariableDeclarations,
-            NeedBraces, NoWhitespaceAfter, NoWhitespaceBefore, OneStatementPerLine, OperatorWrap,
-            PackageName, ParameterName, ParenPad, RedundantImport, RedundantModifier, RightCurly,
+            EmptyForInitializerPad, EmptyLineSeparator, EmptyStatement, FileTabCharacter,
+            FinalClass, FinalLocalVariable, FinalParameters, Indentation, LeftCurly,
+            LocalFinalVariableName, LocalVariableName, MemberName, MethodName, MethodParamPad,
+            ModifierOrder, MultipleVariableDeclarations, NeedBraces, NoWhitespaceAfter,
+            NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, PackageName, ParameterName,
+            ParenPad, RedundantImport, RedundantModifier, RightCurly, SimplifyBooleanExpression,
             SimplifyBooleanReturn, SingleSpaceSeparator, StaticVariableName, TypeName,
             TypecastParenPad, UnusedImports, UpperEll, WhitespaceAfter, WhitespaceAround,
         };
@@ -84,6 +85,7 @@ impl RuleRegistry {
         self.register::<FinalParameters>();
         self.register::<RedundantModifier>();
         self.register::<FinalLocalVariable>();
+        self.register::<FinalClass>();
         // Style rules
         self.register::<UpperEll>();
         self.register::<ArrayTypeStyle>();
@@ -94,6 +96,8 @@ impl RuleRegistry {
         self.register::<OneStatementPerLine>();
         self.register::<MultipleVariableDeclarations>();
         self.register::<SimplifyBooleanReturn>();
+        self.register::<SimplifyBooleanExpression>();
+        self.register::<EmptyStatement>();
         // Naming rules
         self.register::<ConstantName>();
         self.register::<LocalFinalVariableName>();

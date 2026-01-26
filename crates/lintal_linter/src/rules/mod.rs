@@ -12,9 +12,14 @@ pub mod whitespace;
 pub use blocks::{
     AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, LeftCurly, NeedBraces, RightCurly,
 };
-pub use coding::{MultipleVariableDeclarations, OneStatementPerLine, SimplifyBooleanReturn};
+pub use coding::{
+    EmptyStatement, MultipleVariableDeclarations, OneStatementPerLine, SimplifyBooleanExpression,
+    SimplifyBooleanReturn,
+};
 pub use imports::{RedundantImport, UnusedImports};
-pub use modifier::{FinalLocalVariable, FinalParameters, ModifierOrder, RedundantModifier};
+pub use modifier::{
+    FinalClass, FinalLocalVariable, FinalParameters, ModifierOrder, RedundantModifier,
+};
 pub use naming::{
     ConstantName, LocalFinalVariableName, LocalVariableName, MemberName, MethodName, PackageName,
     ParameterName, StaticVariableName, TypeName,

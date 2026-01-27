@@ -13,8 +13,8 @@ pub use blocks::{
     AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, LeftCurly, NeedBraces, RightCurly,
 };
 pub use coding::{
-    EmptyStatement, MultipleVariableDeclarations, OneStatementPerLine, SimplifyBooleanExpression,
-    SimplifyBooleanReturn,
+    DefaultComesLast, EmptyStatement, MultipleVariableDeclarations, OneStatementPerLine,
+    SimplifyBooleanExpression, SimplifyBooleanReturn, StringLiteralEquality,
 };
 pub use imports::{RedundantImport, UnusedImports};
 pub use modifier::{

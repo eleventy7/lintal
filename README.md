@@ -62,7 +62,7 @@ lintal supports macOS and Linux. Windows support is a non-goal.
 
 | Distribution   | Status  | Command                                          |
 |----------------|---------|--------------------------------------------------|
-| GitHub Release | [v0.1.6](https://github.com/eleventy7/lintal/releases/tag/v0.1.6) | Direct download |
+| GitHub Release | [v0.1.9](https://github.com/eleventy7/lintal/releases/tag/v0.1.9) | Direct download |
 | Homebrew       | Working | `brew tap eleventy7/lintal && brew install lintal` |
 | mise ubi       | Ready   | `mise use ubi:eleventy7/lintal`                  |
 
@@ -90,7 +90,7 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-lintal currently implements 42 checkstyle rules. We validate against checkstyle's own test fixtures and real-world projects.
+lintal currently implements 44 checkstyle rules. We validate against checkstyle's own test fixtures and real-world projects.
 
 **Status key:**
 - ✓ = Passes all checkstyle test fixtures
@@ -151,15 +151,17 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 | UnusedImports | ✅ | ✓ |
 | RedundantImport | ✅ | ✓ |
 
-### Coding (5 rules)
+### Coding (7 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
-| OneStatementPerLine | ✅ | ✓ |
-| MultipleVariableDeclarations | ✅ (partial) | ✓ |
-| SimplifyBooleanReturn | ❌ | ✓ |
-| SimplifyBooleanExpression | ✅ | ✓ |
+| DefaultComesLast | ❌ | ✓ |
 | EmptyStatement | ✅ | ✓ |
+| MultipleVariableDeclarations | ✅ (partial) | ✓ |
+| OneStatementPerLine | ✅ | ✓ |
+| SimplifyBooleanExpression | ✅ | ✓ |
+| SimplifyBooleanReturn | ❌ | ✓ |
+| StringLiteralEquality | ✅ | ✓ |
 
 ### Naming (9 rules)
 

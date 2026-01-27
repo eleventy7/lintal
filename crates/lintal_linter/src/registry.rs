@@ -49,15 +49,16 @@ impl RuleRegistry {
     /// Register all built-in rules.
     fn register_builtins(&mut self) {
         use crate::rules::{
-            ArrayTypeStyle, AvoidNestedBlocks, ConstantName, EmptyBlock, EmptyCatchBlock,
-            EmptyForInitializerPad, EmptyLineSeparator, EmptyStatement, FileTabCharacter,
-            FinalClass, FinalLocalVariable, FinalParameters, Indentation, LeftCurly,
-            LocalFinalVariableName, LocalVariableName, MemberName, MethodName, MethodParamPad,
-            ModifierOrder, MultipleVariableDeclarations, NeedBraces, NoWhitespaceAfter,
-            NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, PackageName, ParameterName,
-            ParenPad, RedundantImport, RedundantModifier, RightCurly, SimplifyBooleanExpression,
-            SimplifyBooleanReturn, SingleSpaceSeparator, StaticVariableName, TypeName,
-            TypecastParenPad, UnusedImports, UpperEll, WhitespaceAfter, WhitespaceAround,
+            ArrayTypeStyle, AvoidNestedBlocks, ConstantName, DefaultComesLast, EmptyBlock,
+            EmptyCatchBlock, EmptyForInitializerPad, EmptyLineSeparator, EmptyStatement,
+            FileTabCharacter, FinalClass, FinalLocalVariable, FinalParameters, Indentation,
+            LeftCurly, LocalFinalVariableName, LocalVariableName, MemberName, MethodName,
+            MethodParamPad, ModifierOrder, MultipleVariableDeclarations, NeedBraces,
+            NoWhitespaceAfter, NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, PackageName,
+            ParameterName, ParenPad, RedundantImport, RedundantModifier, RightCurly,
+            SimplifyBooleanExpression, SimplifyBooleanReturn, SingleSpaceSeparator,
+            StaticVariableName, StringLiteralEquality, TypeName, TypecastParenPad, UnusedImports,
+            UpperEll, WhitespaceAfter, WhitespaceAround,
         };
         // Whitespace rules
         self.register::<WhitespaceAround>();
@@ -98,6 +99,8 @@ impl RuleRegistry {
         self.register::<SimplifyBooleanReturn>();
         self.register::<SimplifyBooleanExpression>();
         self.register::<EmptyStatement>();
+        self.register::<StringLiteralEquality>();
+        self.register::<DefaultComesLast>();
         // Naming rules
         self.register::<ConstantName>();
         self.register::<LocalFinalVariableName>();

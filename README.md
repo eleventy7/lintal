@@ -62,7 +62,7 @@ lintal supports macOS and Linux. Windows support is a non-goal.
 
 | Distribution   | Status  | Command                                          |
 |----------------|---------|--------------------------------------------------|
-| GitHub Release | [v0.1.9](https://github.com/eleventy7/lintal/releases/tag/v0.1.9) | Direct download |
+| GitHub Release | [v0.1.10](https://github.com/eleventy7/lintal/releases/tag/v0.1.10) | Direct download |
 | Homebrew       | Working | `brew tap eleventy7/lintal && brew install lintal` |
 | mise ubi       | Ready   | `mise use ubi:eleventy7/lintal`                  |
 

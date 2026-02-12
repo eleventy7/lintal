@@ -50,15 +50,16 @@ impl RuleRegistry {
     fn register_builtins(&mut self) {
         use crate::rules::{
             ArrayTypeStyle, AvoidNestedBlocks, ConstantName, CovariantEquals, DeclarationOrder,
-            DefaultComesLast, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
+            DefaultComesLast, DescendantToken, EmptyBlock, EmptyCatchBlock, EmptyForInitializerPad,
             EmptyLineSeparator, EmptyStatement, EqualsHashCode, FallThrough, FileTabCharacter,
             FinalClass, FinalLocalVariable, FinalParameters, HiddenField,
-            HideUtilityClassConstructor, Indentation, InnerAssignment, LeftCurly, LineLength,
-            LocalFinalVariableName, LocalVariableName, MemberName, MethodLength, MethodName,
-            MethodParamPad, MissingSwitchDefault, ModifierOrder, MultipleVariableDeclarations,
-            MutableException, NeedBraces, NestedTryDepth, NoWhitespaceAfter, NoWhitespaceBefore,
-            OneStatementPerLine, OperatorWrap, PackageDeclaration, PackageName, ParameterName,
-            ParenPad, RedundantImport, RedundantModifier, RightCurly, SimplifyBooleanExpression,
+            HideUtilityClassConstructor, IllegalType, Indentation, InnerAssignment, LeftCurly,
+            LineLength, LocalFinalVariableName, LocalVariableName, MemberName, MethodLength,
+            MethodName, MethodParamPad, MissingSwitchDefault, ModifierOrder,
+            MultipleVariableDeclarations, MutableException, NeedBraces, NestedTryDepth,
+            NoWhitespaceAfter, NoWhitespaceBefore, OneStatementPerLine, OperatorWrap,
+            PackageDeclaration, PackageName, ParameterName, ParenPad, RedundantImport,
+            RedundantModifier, RegexpSinglelineJava, RightCurly, SimplifyBooleanExpression,
             SimplifyBooleanReturn, SingleSpaceSeparator, StaticVariableName, StringLiteralEquality,
             TypeName, TypecastParenPad, UnusedImports, UpperEll, WhitespaceAfter, WhitespaceAround,
         };
@@ -112,6 +113,11 @@ impl RuleRegistry {
         self.register::<DeclarationOrder>();
         self.register::<HiddenField>();
         self.register::<FallThrough>();
+        self.register::<IllegalType>();
+        // Regexp rules
+        self.register::<RegexpSinglelineJava>();
+        // Misc rules
+        self.register::<DescendantToken>();
         // Design rules
         self.register::<HideUtilityClassConstructor>();
         self.register::<MutableException>();

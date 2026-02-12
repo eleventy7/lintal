@@ -2354,6 +2354,51 @@ fn test_debug_difficult_annotations() {
     debug_fixture("InputIndentationDifficultAnnotations.java");
 }
 
+#[test]
+fn test_debug_switch_expr_wrapping() {
+    debug_fixture("InputIndentationSwitchExpressionWrappingIndentation.java");
+}
+
+#[test]
+fn test_debug_switch_expr_violation() {
+    debug_fixture("InputIndentationSwitchExprViolation.java");
+}
+
+#[test]
+fn test_debug_try_strict1() {
+    debug_fixture("InputIndentationTryWithResourcesStrict1.java");
+}
+
+#[test]
+fn test_debug_new_children() {
+    debug_fixture("InputIndentationNewChildren.java");
+}
+
+#[test]
+fn test_debug_switch_on_start() {
+    debug_fixture("InputIndentationSwitchOnStartOfLine.java");
+}
+
+#[test]
+fn test_debug_invalid_try_indent() {
+    debug_fixture("InputIndentationInvalidTryIndent.java");
+}
+
+#[test]
+fn test_debug_records() {
+    debug_fixture("InputIndentationRecordsAndCompactCtors.java");
+}
+
+#[test]
+fn test_debug_check_method_paren() {
+    debug_fixture("InputIndentationCheckMethodParenOnNewLine.java");
+}
+
+#[test]
+fn test_debug_package_decl4() {
+    debug_fixture("InputIndentationPackageDeclaration4.java");
+}
+
 // ============================================================================
 // Lenient indentation tests (forceStrictCondition patterns from real codebases)
 // ============================================================================

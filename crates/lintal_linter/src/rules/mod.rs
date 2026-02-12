@@ -2,6 +2,7 @@
 
 pub mod blocks;
 pub mod coding;
+pub mod design;
 pub mod imports;
 pub mod modifier;
 pub mod naming;
@@ -14,10 +15,12 @@ pub use blocks::{
     AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, LeftCurly, NeedBraces, RightCurly,
 };
 pub use coding::{
-    DefaultComesLast, EmptyStatement, MissingSwitchDefault, MultipleVariableDeclarations,
+    CovariantEquals, DeclarationOrder, DefaultComesLast, EmptyStatement, EqualsHashCode,
+    FallThrough, HiddenField, InnerAssignment, MissingSwitchDefault, MultipleVariableDeclarations,
     NestedTryDepth, OneStatementPerLine, PackageDeclaration, SimplifyBooleanExpression,
     SimplifyBooleanReturn, StringLiteralEquality,
 };
+pub use design::{HideUtilityClassConstructor, MutableException};
 pub use imports::{RedundantImport, UnusedImports};
 pub use modifier::{
     FinalClass, FinalLocalVariable, FinalParameters, ModifierOrder, RedundantModifier,

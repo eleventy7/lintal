@@ -4,8 +4,6 @@
 //! detailed reporting of exact matches, missing items (false negatives),
 //! and false positives.
 
-use std::collections::HashSet;
-
 /// Result of comparing expected vs actual violations.
 #[derive(Debug, Clone)]
 pub struct TestResult {
@@ -22,31 +20,50 @@ pub struct TestResult {
 }
 
 impl TestResult {
-    /// Compare expected and actual violation lines.
+    /// Compare expected and actual violation lines (multiset-aware).
+    /// Duplicate line numbers are handled correctly: if a line appears N times
+    /// in expected and M times in actual, min(N,M) are exact matches.
     pub fn compare(expected: Vec<usize>, actual: Vec<usize>) -> Self {
-        let expected_set: HashSet<usize> = expected.iter().copied().collect();
-        let actual_set: HashSet<usize> = actual.iter().copied().collect();
+        let mut expected_sorted = expected.clone();
+        expected_sorted.sort();
+        let mut actual_sorted = actual.clone();
+        actual_sorted.sort();
 
-        let exact_matches: Vec<usize> = expected_set.intersection(&actual_set).copied().collect();
+        let mut exact_matches = Vec::new();
+        let mut missing = Vec::new();
+        let mut false_positives = Vec::new();
 
-        let missing: Vec<usize> = expected_set.difference(&actual_set).copied().collect();
+        let mut ei = 0;
+        let mut ai = 0;
+        while ei < expected_sorted.len() && ai < actual_sorted.len() {
+            if expected_sorted[ei] == actual_sorted[ai] {
+                exact_matches.push(expected_sorted[ei]);
+                ei += 1;
+                ai += 1;
+            } else if expected_sorted[ei] < actual_sorted[ai] {
+                missing.push(expected_sorted[ei]);
+                ei += 1;
+            } else {
+                false_positives.push(actual_sorted[ai]);
+                ai += 1;
+            }
+        }
+        while ei < expected_sorted.len() {
+            missing.push(expected_sorted[ei]);
+            ei += 1;
+        }
+        while ai < actual_sorted.len() {
+            false_positives.push(actual_sorted[ai]);
+            ai += 1;
+        }
 
-        let false_positives: Vec<usize> = actual_set.difference(&expected_set).copied().collect();
-
-        let mut result = Self {
+        Self {
             expected,
             actual,
             exact_matches,
             missing,
             false_positives,
-        };
-
-        // Sort for consistent output
-        result.exact_matches.sort();
-        result.missing.sort();
-        result.false_positives.sort();
-
-        result
+        }
     }
 
     /// Print a detailed report of the test result.

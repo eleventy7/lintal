@@ -15,7 +15,7 @@ lintal_checkstyle = { path = "../lintal_checkstyle" }
 lintal_diagnostics = { path = "../lintal_diagnostics" }
 lintal_text_size = { path = "../lintal_text_size" }
 lintal_source_file = { path = "../lintal_source_file" }
-regex = "1.12.2"
+regex = "1.12.3"
 lazy_static = "1.4"
 tree-sitter = "0.26"
 

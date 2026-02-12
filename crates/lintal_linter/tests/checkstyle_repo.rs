@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;
 
-/// Pinned checkstyle commit (release checkstyle-13.0.0)
-const CHECKSTYLE_COMMIT: &str = "d02376e3756e37285ddf23957d157fffe2a0f2f5";
+/// Pinned checkstyle commit (release checkstyle-13.2.0)
+const CHECKSTYLE_COMMIT: &str = "4dd3be899e7e2031cc03b0210ab0f178d279adaf";
 const CHECKSTYLE_REPO: &str = "https://github.com/checkstyle/checkstyle.git";
 
 static INIT: Once = Once::new();
@@ -90,6 +90,18 @@ pub fn design_test_input(check_name: &str, file_name: &str) -> Option<PathBuf> {
     let repo = checkstyle_repo()?;
     let path = repo
         .join("src/test/resources/com/puppycrawl/tools/checkstyle/checks/design")
+        .join(check_name.to_lowercase())
+        .join(file_name);
+
+    if path.exists() { Some(path) } else { None }
+}
+
+/// Get path to a checkstyle test input file for sizes checks (LineLength, MethodLength, etc.)
+#[allow(dead_code)]
+pub fn sizes_test_input(check_name: &str, file_name: &str) -> Option<PathBuf> {
+    let repo = checkstyle_repo()?;
+    let path = repo
+        .join("src/test/resources/com/puppycrawl/tools/checkstyle/checks/sizes")
         .join(check_name.to_lowercase())
         .join(file_name);
 

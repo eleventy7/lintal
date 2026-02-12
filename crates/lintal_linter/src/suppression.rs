@@ -322,28 +322,21 @@ impl SuppressionContext {
     }
 
     /// Check if a diagnostic at the given position for the given rule is suppressed.
+    /// Matching is case-insensitive to match checkstyle behavior where
+    /// `@SuppressWarnings("methodlength")` suppresses `MethodLength`.
     pub fn is_suppressed(&self, rule_name: &str, pos: TextSize) -> bool {
-        // Check rule-specific suppressions
-        if let Some(regions) = self.regions.get(rule_name) {
-            for region in regions {
-                if pos >= region.start {
-                    match region.end {
-                        Some(end) if pos < end => return true,
-                        None => return true,
-                        _ => {}
-                    }
-                }
-            }
-        }
+        let rule_lower = rule_name.to_lowercase();
 
-        // Check wildcard suppressions
-        if let Some(regions) = self.regions.get("*") {
-            for region in regions {
-                if pos >= region.start {
-                    match region.end {
-                        Some(end) if pos < end => return true,
-                        None => return true,
-                        _ => {}
+        // Check all regions — compare case-insensitively
+        for (key, regions) in &self.regions {
+            if key == "*" || key.to_lowercase() == rule_lower {
+                for region in regions {
+                    if pos >= region.start {
+                        match region.end {
+                            Some(end) if pos < end => return true,
+                            None => return true,
+                            _ => {}
+                        }
                     }
                 }
             }
@@ -682,6 +675,64 @@ class Foo {
         assert!(
             ctx.is_suppressed("FinalParameters", param_pos),
             "FinalParameters should be suppressed without checkstyle: prefix"
+        );
+    }
+
+    #[test]
+    fn test_suppress_warnings_case_insensitive() {
+        use lintal_java_parser::JavaParser;
+
+        // Aeron/artio use lowercase: @SuppressWarnings("methodlength")
+        let source = r#"
+class Foo {
+    @SuppressWarnings("methodlength")
+    void longMethod() {
+        int x = 1;
+    }
+}
+"#;
+
+        let mut parser = JavaParser::new();
+        let result = parser.parse(source).expect("Failed to parse");
+        let root = CstNode::new(result.tree.root_node(), source);
+
+        let mut ctx = SuppressionContext::new();
+        ctx.parse_suppress_warnings(source, &root);
+
+        assert!(ctx.has_suppressions(), "Should have suppressions");
+
+        let method_pos = TextSize::new(source.find("int x").unwrap() as u32);
+        // The annotation says "methodlength" but rule is "MethodLength" — must match
+        assert!(
+            ctx.is_suppressed("MethodLength", method_pos),
+            "MethodLength should be suppressed with case-insensitive matching"
+        );
+    }
+
+    #[test]
+    fn test_suppress_warnings_checkstyle_prefix_case_insensitive() {
+        use lintal_java_parser::JavaParser;
+
+        let source = r#"
+class Foo {
+    @SuppressWarnings("checkstyle:methodlength")
+    void longMethod() {
+        int x = 1;
+    }
+}
+"#;
+
+        let mut parser = JavaParser::new();
+        let result = parser.parse(source).expect("Failed to parse");
+        let root = CstNode::new(result.tree.root_node(), source);
+
+        let mut ctx = SuppressionContext::new();
+        ctx.parse_suppress_warnings(source, &root);
+
+        let method_pos = TextSize::new(source.find("int x").unwrap() as u32);
+        assert!(
+            ctx.is_suppressed("MethodLength", method_pos),
+            "checkstyle:methodlength should suppress MethodLength"
         );
     }
 

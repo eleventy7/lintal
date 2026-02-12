@@ -103,6 +103,7 @@ impl TestResult {
     }
 
     /// Assert detection rate meets minimum threshold.
+    #[allow(dead_code)]
     pub fn assert_detection_rate(&self, min_percent: f64) {
         let rate = self.detection_rate();
         assert!(

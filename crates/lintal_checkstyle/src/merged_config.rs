@@ -89,23 +89,40 @@ pub struct MergedConfig {
 }
 
 impl MergedConfig {
+    /// Checker-level modules that are not rules (filters, etc.)
+    const NON_RULE_MODULES: &[&str] = &[
+        "SuppressionFilter",
+        "SuppressWarningsFilter",
+        "SeverityMatchFilter",
+        "SuppressWithPlainTextCommentFilter",
+        "SuppressWarningsHolder",
+        "BeforeExecutionExclusionFileFilter",
+    ];
+
     /// Create a merged config from checkstyle.xml and optional lintal.toml.
     pub fn new(checkstyle: &CheckstyleConfig, lintal: Option<&LintalConfig>) -> Self {
         let lintal = lintal.cloned().unwrap_or_default();
 
-        let rules = checkstyle
-            .rules()
+        let make_rule = |module: &&crate::Module| ConfiguredRule {
+            name: module.name.clone(),
+            properties: module
+                .properties_map()
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            mode: lintal.rule_mode(&module.name),
+        };
+
+        let mut rules: Vec<ConfiguredRule> = checkstyle.rules().iter().map(make_rule).collect();
+
+        // Also include Checker-level (file) modules that are actual rules
+        let file_rules = checkstyle
+            .file_modules()
             .iter()
-            .map(|module| ConfiguredRule {
-                name: module.name.clone(),
-                properties: module
-                    .properties_map()
-                    .iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect(),
-                mode: lintal.rule_mode(&module.name),
-            })
-            .collect();
+            .filter(|m| !Self::NON_RULE_MODULES.contains(&m.name.as_str()))
+            .map(make_rule)
+            .collect::<Vec<_>>();
+        rules.extend(file_rules);
 
         Self {
             rules,

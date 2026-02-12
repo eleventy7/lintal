@@ -5,6 +5,7 @@ pub mod coding;
 pub mod imports;
 pub mod modifier;
 pub mod naming;
+pub mod sizes;
 pub mod style;
 pub mod whitespace;
 
@@ -13,8 +14,9 @@ pub use blocks::{
     AvoidNestedBlocks, EmptyBlock, EmptyCatchBlock, LeftCurly, NeedBraces, RightCurly,
 };
 pub use coding::{
-    DefaultComesLast, EmptyStatement, MultipleVariableDeclarations, OneStatementPerLine,
-    SimplifyBooleanExpression, SimplifyBooleanReturn, StringLiteralEquality,
+    DefaultComesLast, EmptyStatement, MissingSwitchDefault, MultipleVariableDeclarations,
+    NestedTryDepth, OneStatementPerLine, PackageDeclaration, SimplifyBooleanExpression,
+    SimplifyBooleanReturn, StringLiteralEquality,
 };
 pub use imports::{RedundantImport, UnusedImports};
 pub use modifier::{
@@ -24,5 +26,6 @@ pub use naming::{
     ConstantName, LocalFinalVariableName, LocalVariableName, MemberName, MethodName, PackageName,
     ParameterName, StaticVariableName, TypeName,
 };
+pub use sizes::{LineLength, MethodLength};
 pub use style::{ArrayTypeStyle, UpperEll};
 pub use whitespace::*;

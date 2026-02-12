@@ -52,9 +52,10 @@ impl RuleRegistry {
             ArrayTypeStyle, AvoidNestedBlocks, ConstantName, DefaultComesLast, EmptyBlock,
             EmptyCatchBlock, EmptyForInitializerPad, EmptyLineSeparator, EmptyStatement,
             FileTabCharacter, FinalClass, FinalLocalVariable, FinalParameters, Indentation,
-            LeftCurly, LocalFinalVariableName, LocalVariableName, MemberName, MethodName,
-            MethodParamPad, ModifierOrder, MultipleVariableDeclarations, NeedBraces,
-            NoWhitespaceAfter, NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, PackageName,
+            LeftCurly, LineLength, LocalFinalVariableName, LocalVariableName, MemberName,
+            MethodLength, MethodName, MethodParamPad, MissingSwitchDefault, ModifierOrder,
+            MultipleVariableDeclarations, NeedBraces, NestedTryDepth, NoWhitespaceAfter,
+            NoWhitespaceBefore, OneStatementPerLine, OperatorWrap, PackageDeclaration, PackageName,
             ParameterName, ParenPad, RedundantImport, RedundantModifier, RightCurly,
             SimplifyBooleanExpression, SimplifyBooleanReturn, SingleSpaceSeparator,
             StaticVariableName, StringLiteralEquality, TypeName, TypecastParenPad, UnusedImports,
@@ -101,6 +102,12 @@ impl RuleRegistry {
         self.register::<EmptyStatement>();
         self.register::<StringLiteralEquality>();
         self.register::<DefaultComesLast>();
+        self.register::<NestedTryDepth>();
+        self.register::<PackageDeclaration>();
+        self.register::<MissingSwitchDefault>();
+        // Size rules
+        self.register::<LineLength>();
+        self.register::<MethodLength>();
         // Naming rules
         self.register::<ConstantName>();
         self.register::<LocalFinalVariableName>();

@@ -90,7 +90,7 @@ lintal fix src/ --diff
 
 ## Supported Rules
 
-lintal currently implements 57 checkstyle rules. We validate against checkstyle's own test fixtures and real-world projects.
+lintal currently implements 60 checkstyle rules. We validate against checkstyle's own test fixtures and real-world projects.
 
 **Status key:**
 - ✓ = Passes all checkstyle test fixtures
@@ -137,12 +137,13 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 | FinalLocalVariable | ✅ | ✓ |
 | FinalClass | ✅ | ✓ |
 
-### Miscellaneous (2 rules)
+### Miscellaneous (3 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
 | UpperEll | ✅ | ✓ |
 | ArrayTypeStyle | ✅ | ✓ |
+| DescendantToken | ❌ | ✓ |
 
 ### Imports (2 rules)
 
@@ -151,7 +152,7 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 | UnusedImports | ✅ | ✓ |
 | RedundantImport | ✅ | ✓ |
 
-### Coding (16 rules)
+### Coding (17 rules)
 
 | Rule | Auto-fix | Status |
 |------|----------|--------|
@@ -162,6 +163,7 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 | EqualsHashCode | ❌ | ✓ |
 | FallThrough | ❌ | ✓ |
 | HiddenField | ❌ | ✓ |
+| IllegalType | ❌ | ✓ |
 | InnerAssignment | ❌ | ✓ |
 | MissingSwitchDefault | ❌ | ✓ |
 | MultipleVariableDeclarations | ✅ (partial) | ✓ |
@@ -185,6 +187,12 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 |------|----------|--------|
 | LineLength | ❌ | ✓ |
 | MethodLength | ❌ | ✓ |
+
+### Regexp (1 rule)
+
+| Rule | Auto-fix | Status |
+|------|----------|--------|
+| RegexpSinglelineJava | ❌ | ✓ |
 
 ### Naming (9 rules)
 

@@ -2258,6 +2258,16 @@ fn test_debug_members2() {
 }
 
 #[test]
+fn test_debug_invalid_method2() {
+    debug_fixture("InputIndentationInvalidMethodIndent2.java");
+}
+
+#[test]
+fn test_debug_brace_adjustment() {
+    debug_fixture("InputIndentationBraceAdjustment.java");
+}
+
+#[test]
 fn test_debug_try_resources_strict() {
     debug_fixture("InputIndentationTryWithResourcesStrict.java");
 }
@@ -2562,6 +2572,537 @@ class Foo {
     assert!(
         violations.is_empty(),
         "Binary expr visual alignment in return should pass, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_annotation_closing_paren_wrong_indent() {
+    // Annotation closing paren on its own line should be at annotation's starting indent.
+    let source = r#"
+@interface SimpleType {
+    String value();
+}
+@SimpleType(
+                value = "test"
+                )
+class Foo {}
+"#;
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // `)` at col 16 should be flagged (expected col 0, same as @SimpleType)
+    assert!(
+        violations.contains(&7),
+        "Annotation closing paren at wrong indent should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_annotation_closing_paren_correct() {
+    // Annotation closing paren at correct indent should not be flagged.
+    let source = r#"
+@interface SimpleType {
+    String value();
+}
+@SimpleType(
+        value = "test"
+)
+class Foo {}
+"#;
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let violations = check_indentation_with_config(source, &config);
+    assert!(
+        violations.is_empty(),
+        "Correctly indented annotation closing paren should pass, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_annotation_before_interface_wrong_indent() {
+    // @interface keyword at wrong indent after annotations should be flagged.
+    let source = r#"
+@interface Marker {}
+@Marker
+           @interface Foo {}
+"#;
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // @interface at col 11 should be flagged (expected col 0)
+    assert!(
+        violations.contains(&4),
+        "@interface at wrong indent should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_synchronized_expr_on_continuation_line() {
+    // Pattern from SynchronizedExprViolation fixture: expression inside synchronized()
+    // wraps to a new line and should be at indent + lineWrappingIndentation.
+    let source = r#"
+class Foo {
+    void method() {
+        synchronized (
+lock
+        ) {
+        }
+    }
+}
+"#;
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let violations = check_indentation_with_config(source, &config);
+    assert!(
+        violations.contains(&5),
+        "lock at col 0 should be flagged (expected col 12), got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_synchronized_method_chain_wrapping() {
+    // Pattern from SynchronizedWrapping fixture: method chain continuation
+    // inside synchronized() should be at indent + lineWrappingIndentation.
+    let source = r#"
+class Foo {
+    void method() {
+        synchronized (lock
+    .getClass()) {
+        }
+    }
+}
+"#;
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("lineWrappingIndentation", "8")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let violations = check_indentation_with_config(source, &config);
+    assert!(
+        violations.contains(&5),
+        ".getClass() at col 4 should be flagged (expected col 16), got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_synchronized_correct_wrapping() {
+    // Correctly indented synchronized with expression wrapping should produce no violations.
+    let source = r#"
+class Foo {
+    void method() {
+        synchronized (
+                lock) {
+        }
+        synchronized (lock
+                .getClass()) {
+        }
+    }
+}
+"#;
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("lineWrappingIndentation", "8")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let violations = check_indentation_with_config(source, &config);
+    assert!(
+        violations.is_empty(),
+        "Correctly wrapped synchronized should pass, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_lambda1_no_false_positive_doubly_nested_method_call() {
+    // Pattern from Lambda1 fixture: r2r(r2r(() -> { ... }))
+    // The doubly-nested method call shifts the lambda body indent by 2 * lineWrappingIndentation.
+    // With basicOffset=2 and lineWrappingIndentation=4:
+    //   Single nest r2r(() -> {}) body at 10, brace at 8
+    //   Double nest r2r(r2r(() -> {})) body at 14, brace at 12
+    // Lintal must NOT flag the doubly-nested body/brace as false positives.
+    let config: HashMap<String, String> = [
+        ("basicOffset", "2"),
+        ("braceAdjustment", "0"),
+        ("caseIndent", "2"),
+        ("throwsIndent", "2"),
+        ("arrayInitIndent", "2"),
+        ("lineWrappingIndentation", "4"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+
+    let source = r#"
+class Foo {
+  Runnable r2r(Runnable r) { return r; }
+  void method() {
+    Runnable r1 = r2r(() -> {
+          int i = 1;
+        }
+    );
+    Runnable r2 = r2r(r2r(() -> {
+              int i = 1;
+            }
+        )
+    );
+  }
+}
+"#;
+    let violations = check_indentation_with_config(source, &config);
+    assert!(
+        violations.is_empty(),
+        "Doubly-nested lambda in method call should not produce false positives, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_ctor_call_binary_expression_continuation() {
+    // Binary expression continuation in super() args should be flagged.
+    // Pattern from InputIndentationCtorCall: super(arg\n+ 1L) where + is under-indented.
+    let source = r#"
+class Base {
+  Base(long arg) {}
+}
+class Child extends Base {
+  Child(long arg) {
+  super(
+  arg
+  + 1L);
+  }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "2"),
+        ("lineWrappingIndentation", "4"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // super at col 2 (exp 4), arg at col 2 (exp 4), + 1L at col 2 (exp 4)
+    assert!(
+        violations.contains(&7),
+        "super() at wrong indent should be flagged, got lines: {:?}",
+        violations
+    );
+    assert!(
+        violations.contains(&9),
+        "Binary continuation + 1L in super args should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_ctor_call_qualified_super_lambda_arg() {
+    // Lambda argument in qualified super with keyword on continuation line.
+    // Pattern from InputIndentationCtorCall: obj.\n    super(\n    x -> arg)
+    let source = r#"
+class Outer {
+  class Base {
+    Base(java.util.function.Function f) {}
+  }
+  class Child extends Base {
+    Child(Outer obj, double arg) {
+      obj.
+          super(
+          x -> arg);
+    }
+  }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "2"),
+        ("lineWrappingIndentation", "4"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // lambda arg `x -> arg` at col 10, exp 12 or 14 (super at 10, + basicOffset=12, + lineWrap=14)
+    assert!(
+        violations.contains(&10),
+        "Lambda arg in qualified super at wrong indent should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_new_args_force_strict_condition() {
+    // With forceStrictCondition=true, constructor argument over-indentation should be flagged.
+    let source = r#"
+class Foo {
+    void test() {
+        int[] tmp = fun2(1, 1,
+                    1);
+    }
+    int[] fun2(int a, int b, int c) { return new int[0]; }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "4"),
+        ("lineWrappingIndentation", "8"),
+        ("forceStrictCondition", "true"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // arg `1` at col 20, exp 16 (8 + 8 lineWrap). Over-indented in strict mode.
+    assert!(
+        violations.contains(&5),
+        "Method call arg over-indentation with strict mode should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_new_strict_nested_object_creation_arg() {
+    // With forceStrictCondition=true, nested new at wrong indent should be flagged.
+    let source = r#"
+class Foo {
+    void test() throws java.io.IOException {
+        java.io.BufferedReader bf =
+                new java.io.BufferedReader(
+                new java.io.InputStreamReader(System.in));
+    }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "4"),
+        ("lineWrappingIndentation", "8"),
+        ("forceStrictCondition", "true"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // inner new at col 16, exp 24 (16 + 8 lineWrap). Under-indented in strict mode.
+    assert!(
+        violations.contains(&6),
+        "Nested new at wrong indent with strict mode should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_binary_expression_in_new_arg_throw_statement() {
+    // Binary expression continuation in throw new IllegalArgumentException("..." + "...")
+    // should be flagged even in lenient mode.
+    let source = r#"
+class Foo {
+  void test(Object invocation, String expression) {
+    throw new IllegalArgumentException("The expression " + expression
+    + ", which creates" + invocation + " cannot be removed."
+    + " Override method.");
+  }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "2"),
+        ("braceAdjustment", "2"),
+        ("lineWrappingIndentation", "4"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // Continuation `+ ...` at col 4, exp 8 (4 + 4 lineWrap)
+    // Only the outermost binary expression's direct continuation is checked
+    assert!(
+        violations.contains(&6),
+        "Binary expr continuation in throw new should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_lambda_arrow_on_continuation_line_strict() {
+    // With forceStrictCondition=true, the arrow on a continuation line
+    // must be at the expected indent, not at a line-wrapped position.
+    let source = r#"
+class Foo {
+    void test() {
+        java.util.function.Function<String, String> f =
+                (string)
+                    -> string;
+    }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "4"),
+        ("lineWrappingIndentation", "4"),
+        ("forceStrictCondition", "true"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // Arrow `->` at col 20, exp 16. Over-indented in strict mode.
+    assert!(
+        violations.contains(&6),
+        "Lambda arrow over-indented in strict mode should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_lambda_arrow_in_arg_list_lenient() {
+    // In argument lists, checkstyle is lenient about arrow continuation.
+    // Arrow at or beyond expected position should NOT be flagged.
+    let source = r#"
+class Foo {
+    void test() {
+        java.util.Arrays.asList("a").stream().filter(
+            (string)
+                -> string != null);
+    }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "4"),
+        ("lineWrappingIndentation", "4"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // Arrow at col 16 in an argument list - should be acceptable (lenient)
+    assert!(
+        !violations.contains(&6),
+        "Lambda arrow in arg list at acceptable indent should NOT be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_lambda_body_brace_at_wrong_position_strict() {
+    // With forceStrictCondition=true, when lambda is at wrong position,
+    // body indent should use expected indent, not actual.
+    let source = r#"
+class Foo {
+    void test() {
+        java.util.function.Function<String, String> f =
+          (string) -> {
+              return string;
+          };
+    }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "4"),
+        ("lineWrappingIndentation", "4"),
+        ("forceStrictCondition", "true"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // Lambda at col 10, exp 12 (8 + 4 lineWrap). Under-indented in strict mode.
+    assert!(
+        violations.contains(&5),
+        "Lambda at wrong position should be flagged in strict mode, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_chain_dot_continuation_under_indented() {
+    // Chain dot on continuation line at statement indent (col 4) instead of
+    // indent + lineWrap (col 8). Should be flagged.
+    let source = r#"
+class Foo {
+  static Foo getInstance() { return new Foo(); }
+  String doNothing(String s) { return s; }
+  public static void main(String[] args) {
+    new Foo().getInstance()
+    .doNothing("a");
+  }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "2"),
+        ("lineWrappingIndentation", "4"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // `.doNothing` at col 4, exp >= 8 (4 + 4 lineWrap)
+    assert!(
+        violations.contains(&7),
+        "Chain dot at statement indent instead of lineWrap should be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_chain_dot_correct_indent_no_false_positive() {
+    // Chain dot at indent + lineWrap = 8, should NOT be flagged.
+    let source = r#"
+class Foo {
+  static Foo getInstance() { return new Foo(); }
+  String doNothing(String s) { return s; }
+  public static void main(String[] args) {
+    new Foo().getInstance()
+        .doNothing("a");
+  }
+}
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "2"),
+        ("lineWrappingIndentation", "4"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    assert!(
+        !violations.contains(&7),
+        "Chain dot at correct indent should NOT be flagged, got lines: {:?}",
+        violations
+    );
+}
+
+#[test]
+fn test_brace_adjustment_constructor_body_indent() {
+    // With braceAdjustment=2, constructor body should be at
+    // parent + braceAdjustment + basicOffset = 0 + 2 + 4 = 6
+    let source = r#"
+class Foo
+  {
+    Foo()
+      {
+        int x = 1;
+      }
+  }
+"#;
+    let config: HashMap<String, String> = [
+        ("basicOffset", "4"),
+        ("braceAdjustment", "2"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+    let violations = check_indentation_with_config(source, &config);
+    // Body at col 8, expected 6 + 4 = 10 (brace at 6, child = 6 + 4 = 10)
+    // But actually: member indent = 4 (class body at 0+4), brace at 6 (4+2),
+    // body at 6+4 = 10. Our source has body at col 8, which is wrong.
+    assert!(
+        violations.contains(&6),
+        "Constructor body at wrong indent with braceAdjustment should be flagged, got lines: {:?}",
         violations
     );
 }

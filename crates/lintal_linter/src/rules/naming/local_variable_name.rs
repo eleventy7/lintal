@@ -194,10 +194,10 @@ impl LocalVariableName {
     fn has_final_modifier(&self, node: &CstNode) -> bool {
         for child in node.children() {
             if child.kind() == "modifiers" {
-                return child.children().any(|c| c.kind() == "final");
+                return crate::rules::modifier::common::has_modifier(&child, "final");
             }
-            // Final can also appear directly
-            if child.kind() == "final" {
+            // Final can also appear directly (or wrapped in modifier node)
+            if crate::rules::modifier::common::resolve_modifier_kind(&child) == "final" {
                 return true;
             }
         }
@@ -209,8 +209,13 @@ impl LocalVariableName {
         // In enhanced_for_statement, final modifier can appear before the type
         for child in node.children() {
             match child.kind() {
-                "modifiers" => return child.children().any(|c| c.kind() == "final"),
-                "final" => return true,
+                "modifiers" => {
+                    return crate::rules::modifier::common::has_modifier(&child, "final");
+                }
+                "final" | "modifier" => {
+                    return crate::rules::modifier::common::resolve_modifier_kind(&child)
+                        == "final";
+                }
                 // Stop at the type - modifiers come before
                 "type_identifier"
                 | "integral_type"

@@ -52,7 +52,7 @@ impl Rule for HideUtilityClassConstructor {
 
         // Skip abstract classes
         if let Some(modifiers) = node.children().find(|c| c.kind() == "modifiers")
-            && modifiers.children().any(|m| m.kind() == "abstract")
+            && crate::rules::modifier::common::has_modifier(&modifiers, "abstract")
         {
             return vec![];
         }
@@ -148,18 +148,10 @@ impl Rule for HideUtilityClassConstructor {
 }
 
 impl HideUtilityClassConstructor {
-    fn has_static_modifier(&self, ctx: &CheckContext, node: &CstNode) -> bool {
+    fn has_static_modifier(&self, _ctx: &CheckContext, node: &CstNode) -> bool {
         for child in node.children() {
             if child.kind() == "modifiers" {
-                for modifier in child.children() {
-                    if modifier.kind() == "static"
-                        || (modifier.kind() == "modifier"
-                            && &ctx.source()[modifier.range()] == "static")
-                    {
-                        return true;
-                    }
-                }
-                return false;
+                return crate::rules::modifier::common::has_modifier(&child, "static");
             }
         }
         false
@@ -168,9 +160,8 @@ impl HideUtilityClassConstructor {
     fn is_non_public_constructor(&self, ctor: &CstNode) -> bool {
         for child in ctor.children() {
             if child.kind() == "modifiers" {
-                return child
-                    .children()
-                    .any(|m| m.kind() == "private" || m.kind() == "protected");
+                return crate::rules::modifier::common::has_modifier(&child, "private")
+                    || crate::rules::modifier::common::has_modifier(&child, "protected");
             }
         }
         false
@@ -197,7 +188,7 @@ impl HideUtilityClassConstructor {
     fn has_specific_modifier(&self, node: &CstNode, modifier_kind: &str) -> bool {
         for child in node.children() {
             if child.kind() == "modifiers" {
-                return child.children().any(|m| m.kind() == modifier_kind);
+                return crate::rules::modifier::common::has_modifier(&child, modifier_kind);
             }
         }
         false

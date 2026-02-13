@@ -70,7 +70,7 @@ impl Rule for CovariantEquals {
         // Skip abstract classes
         if kind == "class_declaration"
             && let Some(modifiers) = node.children().find(|c| c.kind() == "modifiers")
-            && modifiers.children().any(|m| m.kind() == "abstract")
+            && crate::rules::modifier::common::has_modifier(&modifiers, "abstract")
         {
             return vec![];
         }

@@ -316,9 +316,7 @@ impl RedundantModifier {
         modifiers: &CstNode<'a>,
         modifier_name: &str,
     ) -> Option<CstNode<'a>> {
-        modifiers
-            .children()
-            .find(|child| child.kind() == modifier_name)
+        super::common::find_modifier(modifiers, modifier_name)
     }
 
     /// Check if a node is inside an interface or annotation.
@@ -748,7 +746,9 @@ impl RedundantModifier {
         }
 
         // Check if the instanceof has a final modifier
-        let has_final = node.children().any(|c| c.kind() == "final");
+        let has_final = node
+            .children()
+            .any(|c| super::common::resolve_modifier_kind(&c) == "final");
         if !has_final {
             return diagnostics;
         }
@@ -760,7 +760,13 @@ impl RedundantModifier {
 
         if has_underscore {
             // Find the final modifier node
-            if let Some(final_mod) = node.children().find(|c| c.kind() == "final") {
+            if let Some(final_mod) = node.children().find_map(|c| {
+                if super::common::resolve_modifier_kind(&c) == "final" {
+                    Some(super::common::resolve_modifier_node(c))
+                } else {
+                    None
+                }
+            }) {
                 diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
             }
         }
@@ -821,7 +827,13 @@ impl RedundantModifier {
             // Check if the label contains a pattern with final
             if let Some(pattern) = switch_label.children().find(|c| c.kind() == "pattern") {
                 // Check for final modifier in the pattern
-                if let Some(final_mod) = pattern.children().find(|c| c.kind() == "final") {
+                if let Some(final_mod) = pattern.children().find_map(|c| {
+                    if super::common::resolve_modifier_kind(&c) == "final" {
+                        Some(super::common::resolve_modifier_node(c))
+                    } else {
+                        None
+                    }
+                }) {
                     diagnostics.push(self.create_diagnostic(ctx, &final_mod, "final"));
                 }
             }

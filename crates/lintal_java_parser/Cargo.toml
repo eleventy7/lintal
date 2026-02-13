@@ -14,6 +14,6 @@ path = "src/bin/dump_java_ast.rs"
 
 [dependencies]
 tree-sitter = "0.26"
-tree-sitter-java = "0.23"
+tree-sitter-java-orchard = "0.5"
 
 [dev-dependencies]

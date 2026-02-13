@@ -25,11 +25,48 @@ pub fn jls_order_index(modifier: &str) -> Option<usize> {
     JLS_MODIFIER_ORDER.iter().position(|&m| m == modifier)
 }
 
+/// Resolve the actual modifier keyword kind from a child of a `modifiers` node.
+///
+/// In tree-sitter-java-orchard, access modifiers are wrapped in a `visibility` node
+/// and other modifiers in a `modifier` node. This function unwraps those wrappers
+/// to return the actual keyword kind (e.g. "public", "static", "final").
+pub fn resolve_modifier_kind<'a>(node: &CstNode<'a>) -> &'a str {
+    match node.kind() {
+        "visibility" | "modifier" => node
+            .children()
+            .next()
+            .map_or(node.kind(), |child| child.kind()),
+        other => other,
+    }
+}
+
+/// Find the actual keyword node for a modifier child of a `modifiers` node.
+///
+/// If the child is a `visibility` or `modifier` wrapper, returns the inner keyword node.
+/// Otherwise returns the node itself.
+pub fn resolve_modifier_node<'a>(node: CstNode<'a>) -> CstNode<'a> {
+    match node.kind() {
+        "visibility" | "modifier" => node.children().next().unwrap_or(node),
+        _ => node,
+    }
+}
+
 /// Check if a modifiers node contains a specific modifier.
 pub fn has_modifier(modifiers: &CstNode, modifier_kind: &str) -> bool {
     modifiers
         .children()
-        .any(|child| child.kind() == modifier_kind)
+        .any(|child| resolve_modifier_kind(&child) == modifier_kind)
+}
+
+/// Find a specific modifier keyword node within a modifiers node.
+pub fn find_modifier<'a>(modifiers: &CstNode<'a>, modifier_kind: &str) -> Option<CstNode<'a>> {
+    modifiers.children().find_map(|child| {
+        if resolve_modifier_kind(&child) == modifier_kind {
+            Some(resolve_modifier_node(child))
+        } else {
+            None
+        }
+    })
 }
 
 /// Check if we're inside an interface definition.

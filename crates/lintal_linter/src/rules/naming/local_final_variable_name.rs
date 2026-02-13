@@ -295,7 +295,8 @@ impl LocalFinalVariableName {
         let mut found_type = false;
         for child in node.children() {
             // Skip modifiers if present
-            if child.kind() == "modifiers" || child.kind() == "final" {
+            if child.kind() == "modifiers" || child.kind() == "final" || child.kind() == "modifier"
+            {
                 continue;
             }
             // Check for type
@@ -341,9 +342,9 @@ impl LocalFinalVariableName {
     fn has_final_modifier(&self, node: &CstNode) -> bool {
         for child in node.children() {
             if child.kind() == "modifiers" {
-                return child.children().any(|c| c.kind() == "final");
+                return crate::rules::modifier::common::has_modifier(&child, "final");
             }
-            if child.kind() == "final" {
+            if crate::rules::modifier::common::resolve_modifier_kind(&child) == "final" {
                 return true;
             }
         }
@@ -354,8 +355,13 @@ impl LocalFinalVariableName {
     fn enhanced_for_has_final(&self, node: &CstNode) -> bool {
         for child in node.children() {
             match child.kind() {
-                "modifiers" => return child.children().any(|c| c.kind() == "final"),
-                "final" => return true,
+                "modifiers" => {
+                    return crate::rules::modifier::common::has_modifier(&child, "final");
+                }
+                "final" | "modifier" => {
+                    return crate::rules::modifier::common::resolve_modifier_kind(&child)
+                        == "final";
+                }
                 "type_identifier"
                 | "integral_type"
                 | "floating_point_type"

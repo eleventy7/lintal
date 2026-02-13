@@ -483,7 +483,17 @@ impl Indentation {
     fn check_class_body(&self, ctx: &HandlerContext, node: &CstNode, parent_indent: &IndentLevel) {
         // Check braces
         self.check_braces(ctx, node, parent_indent);
+        self.check_class_body_members(ctx, node, parent_indent);
+    }
 
+    /// Check class body members without checking braces.
+    /// Used for anonymous classes where braces are already checked by the parent.
+    fn check_class_body_members(
+        &self,
+        ctx: &HandlerContext,
+        node: &CstNode,
+        parent_indent: &IndentLevel,
+    ) {
         // Children should be indented by basic_offset from parent
         let child_indent = parent_indent.with_offset(self.basic_offset);
 
@@ -4064,6 +4074,17 @@ impl Indentation {
                 expected_brace.add_acceptable(&[lambda_indent, lambda_indent + self.basic_offset]);
         }
 
+        // When new is on the same line as a parent expression
+        // (e.g., `new Thread(new Runnable() {`), the anonymous class body
+        // should use the line-start position as a base for member indentation
+        // and accept it for brace positioning.
+        let new_on_statement_line = new_start < indent.first_level()
+            && node.parent().is_some_and(|p| {
+                self.line_no(ctx, &p) == new_line
+                    || p.parent()
+                        .is_some_and(|gp| self.line_no(ctx, &gp) == new_line)
+            });
+
         for child in node.children() {
             match child.kind() {
                 "class_body" => {
@@ -4077,7 +4098,12 @@ impl Indentation {
                             && ctx.is_on_start_of_line(&rcurly)
                         {
                             let actual_rcurly = ctx.column_from_node(&rcurly);
-                            if !ctx.is_indent_exact(actual_rcurly, &expected_brace) {
+                            let rcurly_expected = if new_on_statement_line {
+                                expected_brace.add_acceptable(&[new_start])
+                            } else {
+                                expected_brace.clone()
+                            };
+                            if !ctx.is_indent_exact(actual_rcurly, &rcurly_expected) {
                                 ctx.log_child_error(
                                     &rcurly,
                                     "block rcurly",
@@ -4116,7 +4142,18 @@ impl Indentation {
                             // Opening brace at end of line (e.g., new Runnable() {)
                             // In lenient mode, avoid propagating under-indented `new`
                             // positions into anonymous class members.
-                            if new_at_wrong_pos {
+                            if new_at_wrong_pos && new_on_statement_line {
+                                // new is inline on same line as parent expression
+                                // (e.g., `new Thread(new Runnable() {`). Use
+                                // line-start position as the body base.
+                                new_indent
+                                    .combine(indent)
+                                    .combine(&new_indent.with_offset(self.basic_offset))
+                                    .combine(&indent.with_offset(self.basic_offset))
+                            } else if new_at_wrong_pos {
+                                // new is on a continuation line but misaligned.
+                                // Use expected indent only to avoid propagating
+                                // the wrong position into members.
                                 indent.combine(&indent.with_offset(self.basic_offset))
                             } else {
                                 new_indent
@@ -4128,7 +4165,7 @@ impl Indentation {
                     } else {
                         new_indent.clone()
                     };
-                    self.check_class_body(ctx, &child, &body_indent);
+                    self.check_class_body_members(ctx, &child, &body_indent);
                 }
                 "argument_list" => {
                     // Use the new expression's line start as base for argument indentation

@@ -2828,15 +2828,15 @@ impl Indentation {
     /// Check indentation of binary/ternary expression continuations.
     fn check_binary_expression(&self, ctx: &HandlerContext, node: &CstNode, indent: &IndentLevel) {
         // Check if this binary expression is inside a context where checkstyle is lenient.
-        // Checkstyle still checks continuation lines in these contexts with a floor check:
-        // if actual < floor, flag it. Only lambda_expression is fully skipped.
+        // Continuation lines still get a floor check (actual must not be below the floor).
         //
         // Context types:
         // 0 = none (full checking)
-        // 1 = argument_list (floor = stmt_indent + lineWrap)
-        // 2 = variable_declarator (floor = indent, since indent may already be line-wrapped)
+        // 1 = argument_list (floor = expression start column)
+        // 2 = variable_declarator on continuation line (floor = indent)
         // 3 = lambda (skip entirely)
-        // 4 = return/throw statement directly (floor = stmt_indent, no lineWrap needed)
+        // 4 = return/throw statement directly (floor = indent + lineWrap)
+        // 5 = variable_declarator on declaration line (floor = indent + lineWrap)
         let lenient_context = {
             let mut current = node.parent();
             let mut context = 0u8;
@@ -2865,14 +2865,12 @@ impl Indentation {
                             && p.parent()
                                 .is_some_and(|gp| gp.kind() == "local_variable_declaration")
                         {
-                            // Check if expression starts on the declaration line or a
-                            // continuation line. If same line: indent is body indent,
-                            // so floor = indent + lineWrap. If continuation: indent
-                            // already includes lineWrap, so floor = indent.
+                            // Distinguish declaration-line expressions from
+                            // continuation-line expressions.
                             if let Some(gp) = p.parent() {
                                 let decl_line = self.line_no(ctx, &gp);
                                 let node_line = self.line_no(ctx, node);
-                                context = if node_line == decl_line { 1 } else { 2 };
+                                context = if node_line == decl_line { 5 } else { 2 };
                             } else {
                                 context = 2;
                             }
@@ -2902,27 +2900,52 @@ impl Indentation {
         }
 
         // For lenient contexts, perform a floor check: flag continuation lines below
-        // the floor, accept any indentation at or above it.
-        // - return/throw/argument_list: floor = stmt_indent + lineWrap
-        //   (stmt_indent is the enclosing statement's indent, NOT the passed `indent`
-        //   which may be inflated by nested line-wrapping contexts)
-        // - variable_declarator: floor = indent (indent may already be line-wrapped)
+        // the floor and accept any indentation at or above it.
         if lenient_context > 0 {
-            // In checkstyle, binary expression continuations are checked
-            // against the handler's own level (= expression start column).
-            // The floor is the expression's start position on its line,
-            // which may be lower than indent + lineWrap when the expr
-            // starts at a non-standard indent (e.g., 2-space aligned args).
             let expr_start_col = ctx.get_line_start(self.line_no(ctx, node));
-            let floor = if lenient_context == 1 || lenient_context == 4 {
-                expr_start_col
-            } else {
-                indent.first_level()
+            let line_wrap_floor = indent.first_level() + self.line_wrapping_indentation;
+            let throw_stmt_wrap_floor = {
+                let mut current = node.parent();
+                let mut floor = None;
+                while let Some(p) = current {
+                    if p.kind() == "throw_statement" {
+                        floor = Some(
+                            ctx.get_line_start(self.line_no(ctx, &p))
+                                + self.line_wrapping_indentation,
+                        );
+                        break;
+                    }
+                    if matches!(
+                        p.kind(),
+                        "expression_statement"
+                            | "return_statement"
+                            | "local_variable_declaration"
+                            | "field_declaration"
+                            | "block"
+                    ) {
+                        break;
+                    }
+                    current = p.parent();
+                }
+                floor
             };
-            let expected = if lenient_context == 1 || lenient_context == 4 {
-                IndentLevel::new(expr_start_col)
-            } else {
-                indent.clone()
+            let (floor, expected) = match lenient_context {
+                1 => {
+                    if let Some(throw_floor) = throw_stmt_wrap_floor {
+                        (throw_floor, IndentLevel::new(throw_floor))
+                    } else {
+                        (expr_start_col, IndentLevel::new(expr_start_col))
+                    }
+                }
+                4 => {
+                    if ctx.force_strict_condition() || node.kind() == "ternary_expression" {
+                        (expr_start_col, IndentLevel::new(expr_start_col))
+                    } else {
+                        (line_wrap_floor, IndentLevel::new(line_wrap_floor))
+                    }
+                }
+                5 => (line_wrap_floor, IndentLevel::new(line_wrap_floor)),
+                _ => (indent.first_level(), indent.clone()),
             };
             let expr_line = self.line_no(ctx, node);
             // Walk left-recursive binary/ternary tree iteratively to check all
@@ -3041,9 +3064,33 @@ impl Indentation {
                     // visual alignment for expression continuations (e.g., string
                     // concatenation, ternary branches) even in strict mode.
                     let expr_line_start = ctx.get_line_start(expr_line);
-                    let acceptable = expected_indent
-                        .combine(&indent.with_offset(self.line_wrapping_indentation))
-                        .add_acceptable(&[expr_start, expr_line_start]);
+                    // Inside array dimensions, checkstyle expects wrapped indentation,
+                    // not visual alignment with expression start.
+                    let in_array_dimension = {
+                        let mut current = node.parent();
+                        let mut found = false;
+                        while let Some(p) = current {
+                            if p.kind() == "dimensions_expr" {
+                                found = true;
+                                break;
+                            }
+                            if !matches!(
+                                p.kind(),
+                                "binary_expression"
+                                    | "ternary_expression"
+                                    | "parenthesized_expression"
+                            ) {
+                                break;
+                            }
+                            current = p.parent();
+                        }
+                        found
+                    };
+                    let mut acceptable = expected_indent
+                        .combine(&indent.with_offset(self.line_wrapping_indentation));
+                    if !in_array_dimension {
+                        acceptable = acceptable.add_acceptable(&[expr_start, expr_line_start]);
+                    }
                     if !ctx.is_indent_exact(actual, &acceptable) {
                         ctx.log_child_error(&child, "expr", actual, &expected_indent);
                     }
@@ -3339,6 +3386,7 @@ impl Indentation {
 
         // Check if lambda itself is at wrong position
         let lambda_at_wrong_pos = !ctx.is_indent_acceptable(lambda_start, indent);
+        let lambda_starts_line = ctx.is_on_start_of_line(node);
 
         // The arrow should be at the same level as the lambda parameters
         // With forceStrictCondition=true, only accept expected position
@@ -3412,7 +3460,9 @@ impl Indentation {
 
                 let block_indent = if in_method_chain_arg {
                     // Lambda in method chain argument - accept actual position
-                    let mut combined = lambda_indent.combine(indent);
+                    let mut combined = lambda_indent
+                        .combine(indent)
+                        .add_acceptable(&[lambda_start + self.line_wrapping_indentation]);
 
                     // Handle doubly-nested calls like r2r(r2r(() -> { ... })) by counting
                     // how many method_invocation(argument_list()) levels surround the lambda.
@@ -3514,15 +3564,16 @@ impl Indentation {
                     ctx.log_child_error(&body, "lambda", actual, &body_indent);
                 }
                 // Check nested expressions in the body
-                let expr_indent = if self.force_strict_condition {
-                    indent.clone()
-                } else {
-                    lambda_indent.clone()
-                };
+                let expr_indent =
+                    if self.force_strict_condition || (lambda_at_wrong_pos && lambda_starts_line) {
+                        indent.clone()
+                    } else {
+                        lambda_indent.clone()
+                    };
                 self.check_expression(ctx, &body, &expr_indent);
             } else {
                 // Same line - check nested expressions
-                let expr_indent = if self.force_strict_condition && lambda_at_wrong_pos {
+                let expr_indent = if lambda_at_wrong_pos && lambda_starts_line {
                     indent.clone()
                 } else {
                     lambda_indent.clone()
@@ -3572,9 +3623,18 @@ impl Indentation {
             // When the chain is at "statement level" (not nested inside an argument list
             // or other expression), checkstyle requires chain continuations at
             // >= indent + lineWrappingIndentation. For nested chains, plain indent is the floor.
-            let is_top_level_chain = {
+            let method_has_multiline_args = node
+                .child_by_field_name("arguments")
+                .and_then(|args| {
+                    self.find_child(&args, ")")
+                        .map(|rparen| self.line_no(ctx, &rparen) > self.line_no(ctx, &args))
+                })
+                .unwrap_or(false);
+
+            let (is_top_level_chain, top_level_expression_stmt) = {
                 let mut current = node.parent();
                 let mut top_level = false;
+                let mut expression_stmt = false;
                 while let Some(p) = current {
                     match p.kind() {
                         "method_invocation" | "parenthesized_expression" | "field_access" => {
@@ -3582,6 +3642,7 @@ impl Indentation {
                         }
                         "expression_statement" | "return_statement" | "throw_statement" => {
                             top_level = true;
+                            expression_stmt = p.kind() == "expression_statement";
                             break;
                         }
                         "variable_declarator" => {
@@ -3612,28 +3673,49 @@ impl Indentation {
                         _ => break,
                     }
                 }
-                top_level
+                (top_level, expression_stmt)
             };
+            let top_level_requires_wrap =
+                is_top_level_chain && (!top_level_expression_stmt || method_has_multiline_args);
 
             if let Some(ref dot) = dot_node {
                 let dot_line = self.line_no(ctx, dot);
                 if dot_line > obj_line && ctx.is_on_start_of_line(dot) {
                     let actual = ctx.get_line_start(dot_line);
+                    let expected_chain_indent = if !is_top_level_chain
+                        && ctx.force_strict_condition()
+                    {
+                        let mut nested_expected =
+                            indent.combine(&indent.with_offset(self.line_wrapping_indentation));
+                        if self.line_wrapping_indentation > 0 {
+                            let additions: Vec<i32> = (2..=6)
+                                .map(|step| {
+                                    indent.first_level() + (step * self.line_wrapping_indentation)
+                                })
+                                .collect();
+                            nested_expected = nested_expected.add_acceptable(&additions);
+                        }
+                        nested_expected
+                    } else if top_level_requires_wrap && !ctx.force_strict_condition() {
+                        indent.with_offset(self.line_wrapping_indentation)
+                    } else {
+                        indent.clone()
+                    };
                     // Also accept column 0 (see checkstyle issue #7675).
-                    // Checkstyle accepts chain dots at any position >= the statement
-                    // indent level, even in strict mode. It does NOT require dots to
-                    // be at indent + lineWrap.
-                    let chain_min = indent.first_level();
-                    if actual != 0 && actual < chain_min {
-                        let expected = indent.with_offset(self.line_wrapping_indentation);
-                        ctx.log_error(dot, "method call", actual, &expected);
+                    if actual != 0 {
+                        if is_top_level_chain && ctx.force_strict_condition() {
+                            if actual < expected_chain_indent.first_level() {
+                                ctx.log_error(dot, "method call", actual, &expected_chain_indent);
+                            }
+                        } else if !ctx.is_indent_acceptable(actual, &expected_chain_indent) {
+                            ctx.log_error(dot, "method call", actual, &expected_chain_indent);
+                        }
                     }
 
                     // Track expected chain position for argument indent computation.
                     // Only applies when dot is on a continuation line.
-                    if is_top_level_chain {
-                        chain_expected_start =
-                            Some(indent.first_level() + self.line_wrapping_indentation);
+                    if top_level_requires_wrap {
+                        chain_expected_start = Some(expected_chain_indent.first_level());
                     }
                 }
             }
@@ -3649,14 +3731,45 @@ impl Indentation {
                     .unwrap_or(obj_line);
                 if name_line > dot_line && ctx.is_on_start_of_line(&name) {
                     let actual = ctx.get_line_start(name_line);
-                    let chain_min = if is_top_level_chain {
-                        indent.first_level() + self.line_wrapping_indentation
+                    let expected_chain_indent = if !is_top_level_chain
+                        && ctx.force_strict_condition()
+                    {
+                        let mut nested_expected =
+                            indent.combine(&indent.with_offset(self.line_wrapping_indentation));
+                        if self.line_wrapping_indentation > 0 {
+                            let additions: Vec<i32> = (2..=6)
+                                .map(|step| {
+                                    indent.first_level() + (step * self.line_wrapping_indentation)
+                                })
+                                .collect();
+                            nested_expected = nested_expected.add_acceptable(&additions);
+                        }
+                        nested_expected
+                    } else if top_level_requires_wrap && !ctx.force_strict_condition() {
+                        indent.with_offset(self.line_wrapping_indentation)
                     } else {
-                        indent.first_level()
+                        indent.clone()
                     };
-                    if actual < chain_min {
-                        let expected = indent.with_offset(self.line_wrapping_indentation);
-                        ctx.log_child_error(&name, "method call", actual, &expected);
+                    // For patterns like `Files.\n    newBufferedWriter(...)`, checkstyle
+                    // accepts name continuation at the previous line start + lineWrap.
+                    let wrapped_from_dot = IndentLevel::new(
+                        ctx.get_line_start(dot_line) + self.line_wrapping_indentation,
+                    );
+                    let expected_name_indent = expected_chain_indent.combine(&wrapped_from_dot);
+                    if is_top_level_chain && ctx.force_strict_condition() {
+                        if actual < expected_chain_indent.first_level() {
+                            ctx.log_child_error(
+                                &name,
+                                "method call",
+                                actual,
+                                &expected_name_indent,
+                            );
+                        }
+                    } else if !ctx.is_indent_acceptable(actual, &expected_name_indent) {
+                        ctx.log_child_error(&name, "method call", actual, &expected_name_indent);
+                    }
+                    if top_level_requires_wrap {
+                        chain_expected_start = Some(expected_chain_indent.first_level());
                     }
                 }
             }
@@ -3723,6 +3836,9 @@ impl Indentation {
                         .is_some_and(|gp| gp.kind() == "field_declaration")
             });
             let skip_arg_indent_check = in_return_context || in_field_context;
+            let in_var_initializer_context = node
+                .parent()
+                .is_some_and(|p| p.kind() == "variable_declarator");
 
             // Detect if the first argument is on a new line (not on the paren line).
             // When all args start on new lines, checkstyle accepts args aligned with
@@ -3731,13 +3847,6 @@ impl Indentation {
                 .children()
                 .find(|c| !matches!(c.kind(), "(" | ")" | "," | "line_comment" | "block_comment"))
                 .is_some_and(|first_arg| self.line_no(ctx, &first_arg) > lparen_line);
-
-            // When first arg is on a new line, also accept method_name_start level
-            let relaxed_arg_indent = if first_arg_on_new_line {
-                arg_indent.add_acceptable(&[method_name_start])
-            } else {
-                arg_indent.clone()
-            };
 
             for child in args.children() {
                 match child.kind() {
@@ -3750,15 +3859,37 @@ impl Indentation {
                             // Arguments on new lines should be indented
                             // Skip this check for return statements and field declarations
                             // where checkstyle is more lenient.
-                            if !skip_arg_indent_check && ctx.is_on_start_of_line(&child) {
+                            let skip_child_indent =
+                                skip_arg_indent_check && child.kind() != "lambda_expression";
+                            if !skip_child_indent && ctx.is_on_start_of_line(&child) {
                                 let actual = ctx.get_line_start(child_line);
-
-                                // Checkstyle accepts method call arguments at any
-                                // position >= the method call's own line start.
-                                // The method call handler's level acts as a floor
-                                // in both strict and lenient modes.
-                                let floor = effective_method_start;
-                                if actual < floor && !relaxed_arg_indent.is_acceptable(actual) {
+                                if ctx.force_strict_condition() {
+                                    let below_floor = actual < effective_method_start;
+                                    let above_strict_max = in_var_initializer_context
+                                        && actual > arg_indent.last_level();
+                                    if below_floor || above_strict_max {
+                                        ctx.log_child_error(
+                                            &child,
+                                            "method call",
+                                            actual,
+                                            &arg_indent,
+                                        );
+                                    }
+                                } else if first_arg_on_new_line {
+                                    let allow_method_alignment = child.kind()
+                                        != "lambda_expression"
+                                        && actual == method_name_start;
+                                    if !allow_method_alignment
+                                        && !ctx.is_indent_acceptable(actual, &arg_indent)
+                                    {
+                                        ctx.log_child_error(
+                                            &child,
+                                            "method call",
+                                            actual,
+                                            &arg_indent,
+                                        );
+                                    }
+                                } else if actual < effective_method_start {
                                     ctx.log_child_error(&child, "method call", actual, &arg_indent);
                                 }
                             }
@@ -3771,6 +3902,7 @@ impl Indentation {
                         let expr_indent = match child.kind() {
                             "object_creation_expression" | "method_invocation" => &arg_base_indent,
                             "binary_expression" | "ternary_expression" => indent,
+                            "lambda_expression" => &arg_base_indent,
                             _ => &nested_indent,
                         };
                         self.check_expression(ctx, &child, expr_indent);
@@ -3809,6 +3941,8 @@ impl Indentation {
         let new_line = self.line_no(ctx, node);
         let new_start = ctx.get_line_start(new_line);
         let new_indent = IndentLevel::new(new_start);
+        let expected_new_pos = indent.combine(&indent.with_offset(self.line_wrapping_indentation));
+        let new_at_wrong_pos = !ctx.is_indent_acceptable(new_start, &expected_new_pos);
 
         // Check type name and lparen on continuation lines.
         // These should be indented relative to the `new` keyword position, not the passed indent.
@@ -3972,17 +4106,24 @@ impl Indentation {
                             // Use that line's indent as the base for the anonymous class body
                             IndentLevel::new(cont_indent)
                         } else if ctx.force_strict_condition() {
-                            // In strict mode, use the actual new position
-                            // The body indent is based on where the `new` actually is
-                            new_indent.clone()
+                            // In strict mode, use expected indent when `new` is misaligned.
+                            if new_at_wrong_pos {
+                                indent.clone()
+                            } else {
+                                new_indent.clone()
+                            }
                         } else {
                             // Opening brace at end of line (e.g., new Runnable() {)
-                            // In lenient mode, combine expected, actual, and their basicOffset
-                            // variants to handle various indentation patterns.
-                            new_indent
-                                .combine(indent)
-                                .combine(&new_indent.with_offset(self.basic_offset))
-                                .combine(&indent.with_offset(self.basic_offset))
+                            // In lenient mode, avoid propagating under-indented `new`
+                            // positions into anonymous class members.
+                            if new_at_wrong_pos {
+                                indent.combine(&indent.with_offset(self.basic_offset))
+                            } else {
+                                new_indent
+                                    .combine(indent)
+                                    .combine(&new_indent.with_offset(self.basic_offset))
+                                    .combine(&indent.with_offset(self.basic_offset))
+                            }
                         }
                     } else {
                         new_indent.clone()
@@ -4005,6 +4146,29 @@ impl Indentation {
                                 .is_some_and(|gp| gp.kind() == "field_declaration")
                     });
                     let skip_arg_indent_check = in_return_context || in_field_context;
+                    let in_try_resource = {
+                        let mut current = node.parent();
+                        let mut found = false;
+                        while let Some(p) = current {
+                            if p.kind() == "resource" {
+                                found = true;
+                                break;
+                            }
+                            if matches!(
+                                p.kind(),
+                                "expression_statement"
+                                    | "return_statement"
+                                    | "throw_statement"
+                                    | "local_variable_declaration"
+                                    | "field_declaration"
+                                    | "block"
+                            ) {
+                                break;
+                            }
+                            current = p.parent();
+                        }
+                        found
+                    };
 
                     let lparen_line = self.line_no(ctx, &child);
 
@@ -4018,17 +4182,6 @@ impl Indentation {
                         })
                         .is_some_and(|first_arg| self.line_no(ctx, &first_arg) > lparen_line);
 
-                    // Only relax when lineWrap <= basicOffset. When lineWrap
-                    // is larger, the gap between new_start and expected arg position
-                    // is too significant to accept as alignment.
-                    let relaxed_new_arg_indent = if first_new_arg_on_new_line
-                        && self.line_wrapping_indentation <= self.basic_offset
-                    {
-                        arg_indent.add_acceptable(&[new_start])
-                    } else {
-                        arg_indent.clone()
-                    };
-
                     for arg in child.children() {
                         match arg.kind() {
                             // Skip punctuation and comments
@@ -4038,14 +4191,40 @@ impl Indentation {
                                 if arg_line > lparen_line && ctx.is_on_start_of_line(&arg) {
                                     let actual = ctx.get_line_start(arg_line);
                                     if !skip_arg_indent_check {
-                                        // Checkstyle accepts constructor arguments at
-                                        // any position >= the `new` expression's line
-                                        // start. The handler's level acts as a floor
-                                        // in both strict and lenient modes.
-                                        let floor = new_start;
-                                        if actual < floor
-                                            && !relaxed_new_arg_indent.is_acceptable(actual)
-                                        {
+                                        if ctx.force_strict_condition() {
+                                            if in_try_resource {
+                                                if !ctx.is_indent_acceptable(actual, &arg_indent) {
+                                                    ctx.log_child_error(
+                                                        &arg,
+                                                        "new",
+                                                        actual,
+                                                        &arg_indent,
+                                                    );
+                                                }
+                                            } else if actual < new_start {
+                                                ctx.log_child_error(
+                                                    &arg,
+                                                    "new",
+                                                    actual,
+                                                    &arg_indent,
+                                                );
+                                            }
+                                        } else if first_new_arg_on_new_line {
+                                            let allow_new_alignment =
+                                                self.line_wrapping_indentation <= self.basic_offset
+                                                    && arg.kind() != "lambda_expression"
+                                                    && actual == new_start;
+                                            if !allow_new_alignment
+                                                && !ctx.is_indent_acceptable(actual, &arg_indent)
+                                            {
+                                                ctx.log_child_error(
+                                                    &arg,
+                                                    "new",
+                                                    actual,
+                                                    &arg_indent,
+                                                );
+                                            }
+                                        } else if actual < new_start {
                                             ctx.log_child_error(&arg, "new", actual, &arg_indent);
                                         }
                                     }
@@ -4054,10 +4233,17 @@ impl Indentation {
                                 // check_binary_expression handler's floor-based
                                 // logic handles continuation lines correctly for
                                 // binary/ternary args without a separate check.
-                                let nested_indent = if ctx.force_strict_condition() {
-                                    &arg_indent
-                                } else {
-                                    &new_indent
+                                let nested_indent = match arg.kind() {
+                                    "object_creation_expression"
+                                    | "method_invocation"
+                                    | "lambda_expression" => &arg_indent,
+                                    _ => {
+                                        if ctx.force_strict_condition() {
+                                            &arg_indent
+                                        } else {
+                                            &new_indent
+                                        }
+                                    }
                                 };
                                 self.check_expression(ctx, &arg, nested_indent);
                             }

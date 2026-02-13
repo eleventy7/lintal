@@ -94,7 +94,7 @@ lintal currently implements 60 checkstyle rules. We validate against checkstyle'
 
 **Status key:**
 - ✓ = Passes all checkstyle test fixtures
-- *89%* = Detection rate on test fixtures (prioritizes zero false positives)
+- *92%* = Fixture match rate on test fixtures (prioritizes zero false positives)
 
 All rules achieve zero false positives on real-world projects (Aeron, Artio, Agrona).
 
@@ -114,7 +114,7 @@ All rules achieve zero false positives on real-world projects (Aeron, Artio, Agr
 | FileTabCharacter | ✅ | ✓ |
 | OperatorWrap | ✅ | ✓ |
 | EmptyLineSeparator | ❌ | ✓ |
-| Indentation | ✅ | 89% |
+| Indentation | ✅ | 92% |
 
 ### Blocks (6 rules)
 

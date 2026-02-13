@@ -2995,7 +2995,7 @@ class Outer {
 
 #[test]
 fn test_new_args_force_strict_condition() {
-    // With forceStrictCondition=true, constructor argument over-indentation should be flagged.
+    // With forceStrictCondition=true, over-indented continuation args should be flagged.
     let source = r#"
 class Foo {
     void test() {
@@ -3014,11 +3014,9 @@ class Foo {
     .map(|(k, v)| (k.to_string(), v.to_string()))
     .collect();
     let violations = check_indentation_with_config(source, &config);
-    // Checkstyle accepts args at any position >= the method call's line start.
-    // arg `1` at col 20 >= method line start (8), so it's accepted.
     assert!(
-        !violations.contains(&5),
-        "Line 5 should NOT be flagged (over-indented arg at >= method start), got lines: {:?}",
+        violations.contains(&5),
+        "Line 5 should be flagged for over-indented strict continuation arg, got lines: {:?}",
         violations
     );
 }
@@ -3056,8 +3054,7 @@ class Foo {
 #[test]
 fn test_binary_expression_in_new_arg_throw_statement() {
     // Binary expression continuation in throw new IllegalArgumentException("..." + "...")
-    // Checkstyle accepts continuations at any position >= the expression's start column.
-    // The handler uses the expression's actual position as its level.
+    // should be flagged when continuation lines are under-indented.
     let source = r#"
 class Foo {
   void test(Object invocation, String expression) {
@@ -3076,10 +3073,9 @@ class Foo {
     .map(|(k, v)| (k.to_string(), v.to_string()))
     .collect();
     let violations = check_indentation_with_config(source, &config);
-    // Continuation at col 4 >= throw line start (4), accepted
     assert!(
-        !violations.contains(&6),
-        "Line 6 should NOT be flagged (continuation at >= expr start), got lines: {:?}",
+        violations.contains(&5) && violations.contains(&6),
+        "Lines 5 and 6 should be flagged for under-indented binary continuations, got lines: {:?}",
         violations
     );
 }
@@ -3249,4 +3245,120 @@ class Foo
         "Constructor body at wrong indent with braceAdjustment should be flagged, got lines: {:?}",
         violations
     );
+}
+
+// ============================================================================
+// Focused parity regressions (missing violations in fixture comparisons)
+// ============================================================================
+
+fn assert_fixture_has_expected_lines(file_name: &str, expected_lines: &[usize]) {
+    let Some(result) = run_fixture_test(file_name) else {
+        eprintln!("Skipping test - checkstyle repo not available");
+        return;
+    };
+
+    for &line in expected_lines {
+        assert!(
+            result.actual.contains(&line),
+            "Fixture {file_name}: expected violation at line {line} is missing. Missing={:?}, Extra={:?}",
+            result.missing,
+            result.extra
+        );
+    }
+}
+
+fn assert_fixture_has_no_extra_lines(file_name: &str, extra_lines: &[usize]) {
+    let Some(result) = run_fixture_test(file_name) else {
+        eprintln!("Skipping test - checkstyle repo not available");
+        return;
+    };
+
+    for &line in extra_lines {
+        assert!(
+            !result.extra.contains(&line),
+            "Fixture {file_name}: unexpected extra violation at line {line}. Missing={:?}, Extra={:?}",
+            result.missing,
+            result.extra
+        );
+    }
+}
+
+#[test]
+fn test_parity_chained_method_calls_core_missing_lines() {
+    assert_fixture_has_expected_lines("InputIndentationChainedMethodCalls.java", &[36, 41, 42]);
+}
+
+#[test]
+fn test_parity_chained_method_with_bracket_core_missing_lines() {
+    assert_fixture_has_expected_lines(
+        "InputIndentationChainedMethodWithBracketOnNewLine.java",
+        &[44, 45],
+    );
+}
+
+#[test]
+fn test_parity_method_call_line_wrap_core_missing_lines() {
+    assert_fixture_has_expected_lines("InputIndentationMethodCallLineWrap.java", &[53, 75]);
+}
+
+#[test]
+fn test_parity_new_children_core_missing_lines() {
+    assert_fixture_has_expected_lines("InputIndentationNewChildren.java", &[28, 43, 56, 57, 63]);
+}
+
+#[test]
+fn test_parity_new_children_sevntu_core_missing_lines() {
+    assert_fixture_has_expected_lines("InputIndentationNewChildrenSevntuConfig.java", &[43]);
+}
+
+#[test]
+fn test_parity_new_force_strict_core_missing_lines() {
+    assert_fixture_has_expected_lines(
+        "InputIndentationNewWithForceStrictCondition.java",
+        &[33, 37, 49, 50, 55],
+    );
+}
+
+#[test]
+fn test_parity_try_with_resources_strict_core_missing_lines() {
+    assert_fixture_has_expected_lines("InputIndentationTryWithResourcesStrict.java", &[79]);
+}
+
+#[test]
+fn test_parity_try_with_resources_strict1_core_missing_lines() {
+    assert_fixture_has_expected_lines("InputIndentationTryWithResourcesStrict1.java", &[60, 67]);
+}
+
+#[test]
+fn test_parity_multiline_statements_core_missing_lines() {
+    assert_fixture_has_expected_lines(
+        "InputIndentationMultilineStatements.java",
+        &[23, 39, 40, 65],
+    );
+}
+
+#[test]
+fn test_parity_new_children_sevntu_no_false_positive_lines() {
+    assert_fixture_has_no_extra_lines(
+        "InputIndentationNewChildrenSevntuConfig.java",
+        &[37, 42, 46],
+    );
+}
+
+#[test]
+fn test_parity_try_with_resources_strict_no_false_positive_lines() {
+    assert_fixture_has_no_extra_lines(
+        "InputIndentationTryWithResourcesStrict.java",
+        &[46, 92, 94, 95, 96],
+    );
+}
+
+#[test]
+fn test_parity_if_and_parameter_no_false_positive_line_107() {
+    assert_fixture_has_no_extra_lines("InputIndentationIfAndParameter.java", &[107]);
+}
+
+#[test]
+fn test_parity_correct_if_and_parameter1_no_false_positive_line_44() {
+    assert_fixture_has_no_extra_lines("InputIndentationCorrectIfAndParameter1.java", &[44]);
 }

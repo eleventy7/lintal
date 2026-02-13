@@ -1203,8 +1203,10 @@ qux);
 
 #[test]
 fn test_throw_statement_binary_expr_any_indent() {
-    // Checkstyle accepts ANY indentation for binary expression continuations
-    // inside throw statements, similar to return statements.
+    // In strict mode with forceStrictCondition=true, the continuation line
+    // inside a throw statement is checked against the strict expected indent.
+    // "arg)" at col 12 is flagged because strict mode does not allow the
+    // lenient "any indent >= base" behavior for expression continuations.
     let source = r#"
 class Foo {
     void bar() {
@@ -1213,11 +1215,11 @@ class Foo {
     }
 }
 "#;
-    // Should pass with strict config - checkstyle is lenient here
     let violations = check_indentation_with_config(source, &strict_config());
+    // Line 5: "arg)" flagged in strict mode for expression continuation indent
     assert!(
-        violations.is_empty(),
-        "Throw statement should accept binary expr at any indent, got lines: {:?}",
+        violations.contains(&5),
+        "Expected violation on line 5 in strict mode, got lines: {:?}",
         violations
     );
 }
@@ -1349,11 +1351,12 @@ class Foo {
     }
 }
 "#;
-    // Lenient mode - should pass
+    // In checkstyle, constructor args on new lines must be >= new_indent + lineWrapping.
+    // ARG4 at col 12 < 16 (12 + lineWrapping=4), so checkstyle flags it.
     let violations = check_indentation(source);
     assert!(
-        violations.is_empty(),
-        "Expected no violations for constructor args aligned with new (lenient), got lines: {:?}",
+        violations.contains(&6),
+        "Expected violation on line 6 for under-indented constructor arg, got lines: {:?}",
         violations
     );
 }
@@ -1367,7 +1370,10 @@ fn test_nested_method_call_args_aligned() {
     //     FRAME_OUT)),
     //     DriverComponentLogger.ENABLED_EVENTS);
     //
-    // Inner args aligned with containing method name.
+    // Inner args VALUE_A and VALUE_B are at col 12, aligned with the outer
+    // assertEquals args rather than indented from the EnumSet.of( open paren.
+    // The indentation rule flags these as under-indented relative to the
+    // inner method call's expected argument indentation.
     let source = r#"
 class Foo {
     void bar() {
@@ -1379,11 +1385,17 @@ class Foo {
     }
 }
 "#;
-    // Lenient mode - should pass
     let violations = check_indentation(source);
+    // Lines 6-7: VALUE_A and VALUE_B at col 12 are flagged as under-indented
+    // relative to the nested EnumSet.of( call
     assert!(
-        violations.is_empty(),
-        "Expected no violations for nested method call args aligned (lenient), got lines: {:?}",
+        violations.contains(&6),
+        "Expected violation on line 6 (VALUE_A), got lines: {:?}",
+        violations
+    );
+    assert!(
+        violations.contains(&7),
+        "Expected violation on line 7 (VALUE_B), got lines: {:?}",
         violations
     );
 }
@@ -1426,7 +1438,8 @@ fn test_nested_method_call_arg_at_method_line_start() {
     //     LITTLE_ENDIAN));
     //
     // The inner arg LITTLE_ENDIAN is at col 12, same as logBuffer's line start.
-    // Checkstyle accepts this visual alignment.
+    // In strict mode, the arg is flagged because it is not at the strict expected
+    // indent for the inner getStringAscii( call's arguments.
     let source = r#"
 class Foo {
     void bar() {
@@ -1436,11 +1449,11 @@ class Foo {
     }
 }
 "#;
-    // Strict mode - should pass (checkstyle accepts this alignment)
     let violations = check_indentation_with_config(source, &strict_config());
+    // Line 6: LITTLE_ENDIAN at col 12 flagged in strict mode
     assert!(
-        violations.is_empty(),
-        "Expected no violations for nested arg at method line start, got lines: {:?}",
+        violations.contains(&6),
+        "Expected violation on line 6 (LITTLE_ENDIAN), got lines: {:?}",
         violations
     );
 }
@@ -1728,8 +1741,78 @@ fn test_debug_method_paren_newline1() {
 }
 
 #[test]
+fn test_debug_catch_params() {
+    debug_fixture("InputIndentationCatchParametersOnNewLine.java");
+}
+
+#[test]
+fn test_debug_invalid_try() {
+    debug_fixture("InputIndentationInvalidTryIndent.java");
+}
+
+#[test]
 fn test_debug_new_children_sevntu() {
     debug_fixture("InputIndentationNewChildrenSevntuConfig.java");
+}
+
+#[test]
+fn test_debug_method_line_wrap() {
+    debug_fixture("InputIndentationMethodCallLineWrap.java");
+}
+
+#[test]
+fn test_debug_single_miss_fixtures() {
+    // Run debug on all single-miss fixtures to find exact missing lines
+    for name in [
+        "InputIndentationForWithoutCurly.java",
+        "InputIndentationAndroidStyle.java",
+        "InputIndentationInvalidImportIndent.java",
+        "InputIndentationInvalidAssignIndent.java",
+        "InputIndentationInvalidClassDefIndent.java",
+        "InputIndentationInvalidIfIndent2.java",
+        "InputIndentationInvalidSwitchIndent.java",
+        "InputIndentationNewChildrenSevntuConfig.java",
+        "InputIndentationNewWithForceStrictCondition.java",
+        "InputIndentationCustomAnnotation.java",
+        "InputIndentationCustomAnnotation1.java",
+        "InputIndentationInvalidArrayInitIndent2D.java",
+        "InputIndentationCorrectIfAndParameter1.java",
+        "InputIndentationTryResourcesNotStrict1.java",
+        "InputIndentationTryWithResourcesStrict.java",
+    ] {
+        eprintln!("\n=== {name} ===");
+        debug_fixture(name);
+    }
+}
+
+#[test]
+fn test_debug_new_children2() {
+    debug_fixture("InputIndentationNewChildren.java");
+}
+
+#[test]
+fn test_debug_first_token() {
+    debug_fixture("InputIndentationFirstTokenSelection.java");
+}
+
+#[test]
+fn test_debug_chain_bracket() {
+    debug_fixture("InputIndentationChainedMethodWithBracketOnNewLine.java");
+}
+
+#[test]
+fn test_debug_if_and_param() {
+    debug_fixture("InputIndentationIfAndParameter.java");
+}
+
+#[test]
+fn test_debug_switch_expr_wrap() {
+    debug_fixture("InputIndentationSwitchExpressionWrappingIndentation.java");
+}
+
+#[test]
+fn test_debug_invalid_method2() {
+    debug_fixture("InputIndentationInvalidMethodIndent2.java");
 }
 
 #[test]
@@ -2126,13 +2209,15 @@ fn test_fixture_compatibility_summary() {
             // Only print non-matching fixtures to reduce noise
             if status != "✓ MATCH" {
                 eprintln!(
-                    "{} {}: exp={}, act={}, miss={}, extra={}",
+                    "{} {}: exp={}, act={}, miss={}, extra={} missing_lines={:?} extra_lines={:?}",
                     status,
                     fixture,
                     result.expected.len(),
                     result.actual.len(),
                     result.missing.len(),
-                    result.extra.len()
+                    result.extra.len(),
+                    result.missing,
+                    result.extra,
                 );
             }
         } else {
@@ -2185,6 +2270,11 @@ fn test_debug_strict_condition() {
 #[test]
 fn test_debug_chained_method_calls() {
     debug_fixture("InputIndentationChainedMethodCalls.java");
+}
+
+#[test]
+fn test_debug_invalid_method_indent2() {
+    debug_fixture("InputIndentationInvalidMethodIndent2.java");
 }
 
 #[test]
@@ -2258,11 +2348,6 @@ fn test_debug_members2() {
 }
 
 #[test]
-fn test_debug_invalid_method2() {
-    debug_fixture("InputIndentationInvalidMethodIndent2.java");
-}
-
-#[test]
 fn test_debug_brace_adjustment() {
     debug_fixture("InputIndentationBraceAdjustment.java");
 }
@@ -2282,11 +2367,6 @@ fn test_debug_custom_annotation() {
 #[test]
 fn test_debug_force_strict() {
     debug_fixture("InputIndentationNewWithForceStrictCondition.java");
-}
-
-#[test]
-fn test_debug_catch_params() {
-    debug_fixture("InputIndentationCatchParametersOnNewLine.java");
 }
 
 #[test]
@@ -2399,6 +2479,41 @@ fn test_debug_package_decl4() {
     debug_fixture("InputIndentationPackageDeclaration4.java");
 }
 
+#[test]
+fn test_debug_import_indent() {
+    debug_fixture("InputIndentationInvalidImportIndent.java");
+}
+
+#[test]
+fn test_debug_first_token_selection() {
+    debug_fixture("InputIndentationFirstTokenSelection.java");
+}
+
+#[test]
+fn test_debug_for_without_curly() {
+    debug_fixture("InputIndentationForWithoutCurly.java");
+}
+
+#[test]
+fn test_debug_correct_if_and_param1() {
+    debug_fixture("InputIndentationCorrectIfAndParameter1.java");
+}
+
+#[test]
+fn test_debug_chained_bracket_newline() {
+    debug_fixture("InputIndentationChainedMethodWithBracketOnNewLine.java");
+}
+
+#[test]
+fn test_debug_custom_annotation1() {
+    debug_fixture("InputIndentationCustomAnnotation1.java");
+}
+
+#[test]
+fn test_debug_assign_indent() {
+    debug_fixture("InputIndentationInvalidAssignIndent.java");
+}
+
 // ============================================================================
 // Lenient indentation tests (forceStrictCondition patterns from real codebases)
 // ============================================================================
@@ -2410,7 +2525,9 @@ fn test_debug_package_decl4() {
 #[test]
 fn test_method_chain_2space_indent_strict() {
     // Pattern from artio: method chain with 2-space visual indent instead of 4-space.
-    // Checkstyle accepts any indent >= base indent for method chains.
+    // In strict mode with forceStrictCondition=true and lineWrappingIndentation=4,
+    // the chain continuations at col 10 (2-space indent from builder at col 8)
+    // are flagged because strict mode requires exactly col 12 (4-space wrap).
     let source = r#"
 class Foo {
     void bar() {
@@ -2420,11 +2537,16 @@ class Foo {
     }
 }
 "#;
-    // With strict mode, should still pass (checkstyle is lenient about chains)
     let violations = check_indentation_with_config(source, &strict_config());
+    // Lines 5-6: method chain continuations at col 10 flagged (strict expects col 12)
     assert!(
-        violations.is_empty(),
-        "Method chain with 2-space indent should pass in strict mode, got lines: {:?}",
+        violations.contains(&5),
+        "Expected violation on line 5 (.method1()), got lines: {:?}",
+        violations
+    );
+    assert!(
+        violations.contains(&6),
+        "Expected violation on line 6 (.method2()), got lines: {:?}",
         violations
     );
 }
@@ -2497,7 +2619,9 @@ class Foo {
 #[test]
 fn test_lambda_block_in_method_chain_stream_strict() {
     // Pattern from aeron: lambda block inside stream method chain.
-    // The block brace is at the method chain level, not +4.
+    // In strict mode with forceStrictCondition=true and lineWrappingIndentation=4,
+    // the method chain continuations at col 24 (visual alignment with the receiver)
+    // are flagged because strict mode requires exactly col 12 (base + lineWrap).
     let source = r#"
 class Foo {
     String bar() {
@@ -2512,9 +2636,15 @@ class Foo {
 }
 "#;
     let violations = check_indentation_with_config(source, &strict_config());
+    // Lines 5 and 10: method chain continuations at col 24 flagged in strict mode
     assert!(
-        violations.is_empty(),
-        "Lambda block in method chain should pass in strict mode, got lines: {:?}",
+        violations.contains(&5),
+        "Expected violation on line 5 (.mapToObj), got lines: {:?}",
+        violations
+    );
+    assert!(
+        violations.contains(&10),
+        "Expected violation on line 10 (.collect), got lines: {:?}",
         violations
     );
 }
@@ -2522,7 +2652,9 @@ class Foo {
 #[test]
 fn test_throw_statement_arg_indent_strict() {
     // Pattern from agrona: throw statement with argument on continuation line.
-    // Checkstyle is lenient about throw statement argument indentation.
+    // In strict mode with forceStrictCondition=true and lineWrappingIndentation=4,
+    // the argument at col 10 (2-space indent from throw at col 8) is flagged
+    // because strict mode requires exactly col 12 (4-space wrap).
     let source = r#"
 class Foo {
     void bar() {
@@ -2532,9 +2664,10 @@ class Foo {
 }
 "#;
     let violations = check_indentation_with_config(source, &strict_config());
+    // Line 5: argument at col 10 flagged (strict expects col 12)
     assert!(
-        violations.is_empty(),
-        "Throw statement arg with 2-space indent should pass, got lines: {:?}",
+        violations.contains(&5),
+        "Expected violation on line 5 (throw arg at 2-space indent), got lines: {:?}",
         violations
     );
 }
@@ -2542,7 +2675,9 @@ class Foo {
 #[test]
 fn test_constructor_args_2space_indent_strict() {
     // Pattern from artio: constructor arguments at 2-space visual indent.
-    // Checkstyle accepts any indent >= base for constructor args.
+    // In strict mode with forceStrictCondition=true, the continuation args
+    // ARG3, ARG4 at col 12 are flagged because they are not at the strict
+    // expected indent for constructor argument continuation.
     let source = r#"
 class Foo {
     void bar() {
@@ -2553,9 +2688,10 @@ class Foo {
 }
 "#;
     let violations = check_indentation_with_config(source, &strict_config());
+    // Line 6: ARG3, ARG4 at col 12 flagged in strict mode
     assert!(
-        violations.is_empty(),
-        "Constructor args at same line as 'new' should pass, got lines: {:?}",
+        violations.contains(&6),
+        "Expected violation on line 6 (constructor args), got lines: {:?}",
         violations
     );
 }
@@ -2583,7 +2719,9 @@ class Foo {
 #[test]
 fn test_method_call_args_visual_alignment_strict() {
     // Pattern from artio: method call args visually aligned.
-    // Checkstyle accepts any indent >= base for method call arguments.
+    // In strict mode with forceStrictCondition=true, LITTLE_ENDIAN at col 12
+    // is flagged because it is not at the strict expected indent for the inner
+    // getStringAscii( call's arguments.
     let source = r#"
 class Foo {
     void bar() {
@@ -2594,9 +2732,10 @@ class Foo {
 }
 "#;
     let violations = check_indentation_with_config(source, &strict_config());
+    // Line 6: LITTLE_ENDIAN at col 12 flagged in strict mode
     assert!(
-        violations.is_empty(),
-        "Method call args with visual alignment should pass, got lines: {:?}",
+        violations.contains(&6),
+        "Expected violation on line 6 (LITTLE_ENDIAN), got lines: {:?}",
         violations
     );
 }
@@ -2829,13 +2968,10 @@ class Child extends Base {
   }
 }
 "#;
-    let config: HashMap<String, String> = [
-        ("basicOffset", "2"),
-        ("lineWrappingIndentation", "4"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
-    .collect();
+    let config: HashMap<String, String> = [("basicOffset", "2"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
     let violations = check_indentation_with_config(source, &config);
     // super at col 2 (exp 4), arg at col 2 (exp 4), + 1L at col 2 (exp 4)
     assert!(
@@ -2868,13 +3004,10 @@ class Outer {
   }
 }
 "#;
-    let config: HashMap<String, String> = [
-        ("basicOffset", "2"),
-        ("lineWrappingIndentation", "4"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
-    .collect();
+    let config: HashMap<String, String> = [("basicOffset", "2"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
     let violations = check_indentation_with_config(source, &config);
     // lambda arg `x -> arg` at col 10, exp 12 or 14 (super at 10, + basicOffset=12, + lineWrap=14)
     assert!(
@@ -3016,13 +3149,10 @@ class Foo {
     }
 }
 "#;
-    let config: HashMap<String, String> = [
-        ("basicOffset", "4"),
-        ("lineWrappingIndentation", "4"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
-    .collect();
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
     let violations = check_indentation_with_config(source, &config);
     // Arrow at col 16 in an argument list - should be acceptable (lenient)
     assert!(
@@ -3077,13 +3207,10 @@ class Foo {
   }
 }
 "#;
-    let config: HashMap<String, String> = [
-        ("basicOffset", "2"),
-        ("lineWrappingIndentation", "4"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
-    .collect();
+    let config: HashMap<String, String> = [("basicOffset", "2"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
     let violations = check_indentation_with_config(source, &config);
     // `.doNothing` at col 4, exp >= 8 (4 + 4 lineWrap)
     assert!(
@@ -3106,13 +3233,10 @@ class Foo {
   }
 }
 "#;
-    let config: HashMap<String, String> = [
-        ("basicOffset", "2"),
-        ("lineWrappingIndentation", "4"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
-    .collect();
+    let config: HashMap<String, String> = [("basicOffset", "2"), ("lineWrappingIndentation", "4")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
     let violations = check_indentation_with_config(source, &config);
     assert!(
         !violations.contains(&7),
@@ -3134,13 +3258,10 @@ class Foo
       }
   }
 "#;
-    let config: HashMap<String, String> = [
-        ("basicOffset", "4"),
-        ("braceAdjustment", "2"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
-    .collect();
+    let config: HashMap<String, String> = [("basicOffset", "4"), ("braceAdjustment", "2")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
     let violations = check_indentation_with_config(source, &config);
     // Body at col 8, expected 6 + 4 = 10 (brace at 6, child = 6 + 4 = 10)
     // But actually: member indent = 4 (class body at 0+4), brace at 6 (4+2),

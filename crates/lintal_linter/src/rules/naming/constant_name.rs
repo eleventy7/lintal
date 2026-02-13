@@ -138,8 +138,7 @@ impl ConstantName {
             return vec![];
         };
 
-        let has_static =
-            crate::rules::modifier::common::has_modifier(&modifiers, "static");
+        let has_static = crate::rules::modifier::common::has_modifier(&modifiers, "static");
         let has_final = crate::rules::modifier::common::has_modifier(&modifiers, "final");
 
         // Not a constant if not static final
@@ -251,8 +250,7 @@ impl ConstantName {
         node: &CstNode,
     ) -> bool {
         let has_public = crate::rules::modifier::common::has_modifier(modifiers, "public");
-        let has_protected =
-            crate::rules::modifier::common::has_modifier(modifiers, "protected");
+        let has_protected = crate::rules::modifier::common::has_modifier(modifiers, "protected");
         let has_private = crate::rules::modifier::common::has_modifier(modifiers, "private");
 
         // Check if in interface or annotation (implicitly public)

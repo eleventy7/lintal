@@ -96,12 +96,9 @@ impl Rule for MutableException {
             }
 
             // Check if the field has the final modifier
-            let has_final = child
-                .children()
-                .any(|c| {
-                    c.kind() == "modifiers"
-                        && crate::rules::modifier::common::has_modifier(&c, "final")
-                });
+            let has_final = child.children().any(|c| {
+                c.kind() == "modifiers" && crate::rules::modifier::common::has_modifier(&c, "final")
+            });
 
             if has_final {
                 continue;

@@ -295,9 +295,7 @@ impl LocalFinalVariableName {
         let mut found_type = false;
         for child in node.children() {
             // Skip modifiers if present
-            if child.kind() == "modifiers"
-                || child.kind() == "final"
-                || child.kind() == "modifier"
+            if child.kind() == "modifiers" || child.kind() == "final" || child.kind() == "modifier"
             {
                 continue;
             }

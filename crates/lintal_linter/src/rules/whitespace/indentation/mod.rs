@@ -2798,12 +2798,7 @@ impl Indentation {
                         if child_line > access_line && ctx.is_on_start_of_line(&child) {
                             let actual = ctx.get_line_start(child_line);
                             if !ctx.is_indent_acceptable(actual, &line_wrapped) {
-                                ctx.log_child_error(
-                                    &child,
-                                    "array access",
-                                    actual,
-                                    &line_wrapped,
-                                );
+                                ctx.log_child_error(&child, "array access", actual, &line_wrapped);
                             }
                         }
                     }

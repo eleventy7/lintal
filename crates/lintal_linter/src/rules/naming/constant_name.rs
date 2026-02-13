@@ -138,8 +138,9 @@ impl ConstantName {
             return vec![];
         };
 
-        let has_static = modifiers.children().any(|c| c.kind() == "static");
-        let has_final = modifiers.children().any(|c| c.kind() == "final");
+        let has_static =
+            crate::rules::modifier::common::has_modifier(&modifiers, "static");
+        let has_final = crate::rules::modifier::common::has_modifier(&modifiers, "final");
 
         // Not a constant if not static final
         if !has_static || !has_final {
@@ -249,9 +250,10 @@ impl ConstantName {
         _ctx: &CheckContext,
         node: &CstNode,
     ) -> bool {
-        let has_public = modifiers.children().any(|c| c.kind() == "public");
-        let has_protected = modifiers.children().any(|c| c.kind() == "protected");
-        let has_private = modifiers.children().any(|c| c.kind() == "private");
+        let has_public = crate::rules::modifier::common::has_modifier(modifiers, "public");
+        let has_protected =
+            crate::rules::modifier::common::has_modifier(modifiers, "protected");
+        let has_private = crate::rules::modifier::common::has_modifier(modifiers, "private");
 
         // Check if in interface or annotation (implicitly public)
         let in_interface = self.is_in_interface_or_annotation(node);

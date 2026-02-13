@@ -17,7 +17,7 @@ public class Input {
         } catch (Exception e) {
             System.out.println("catch");
         } finally {
-           System.out.println("finally");
+            System.out.println("finally");
         }
     }
 
@@ -61,7 +61,7 @@ public class Input {
             System.out.println("runtime error");
         } finally {
             if (true) {
-             System.out.println("cleanup");
+                System.out.println("cleanup");
             }
         }
     }

@@ -17,7 +17,7 @@ pub struct JavaParser {
 
 /// Return the tree-sitter Java language.
 pub fn java_language() -> tree_sitter::Language {
-    tree_sitter_java::LANGUAGE.into()
+    tree_sitter_java_orchard::LANGUAGE.into()
 }
 
 /// Return a map from node kind string to one or more kind IDs.
@@ -45,7 +45,7 @@ impl JavaParser {
     pub fn new() -> Self {
         let mut parser = tree_sitter::Parser::new();
         parser
-            .set_language(&tree_sitter_java::LANGUAGE.into())
+            .set_language(&tree_sitter_java_orchard::LANGUAGE.into())
             .expect("Failed to load Java grammar");
         Self { parser }
     }

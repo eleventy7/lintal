@@ -229,25 +229,17 @@ impl Rule for DeclarationOrder {
 }
 
 impl DeclarationOrder {
-    fn get_access_level(&self, ctx: &CheckContext, node: &CstNode) -> AccessLevel {
+    fn get_access_level(&self, _ctx: &CheckContext, node: &CstNode) -> AccessLevel {
         for child in node.children() {
             if child.kind() == "modifiers" {
-                for modifier in child.children() {
-                    match modifier.kind() {
-                        "public" => return AccessLevel::Public,
-                        "protected" => return AccessLevel::Protected,
-                        "private" => return AccessLevel::Private,
-                        "modifier" => {
-                            let text = &ctx.source()[modifier.range()];
-                            match text {
-                                "public" => return AccessLevel::Public,
-                                "protected" => return AccessLevel::Protected,
-                                "private" => return AccessLevel::Private,
-                                _ => {}
-                            }
-                        }
-                        _ => {}
-                    }
+                if crate::rules::modifier::common::has_modifier(&child, "public") {
+                    return AccessLevel::Public;
+                }
+                if crate::rules::modifier::common::has_modifier(&child, "protected") {
+                    return AccessLevel::Protected;
+                }
+                if crate::rules::modifier::common::has_modifier(&child, "private") {
+                    return AccessLevel::Private;
                 }
                 return AccessLevel::PackagePrivate;
             }
@@ -255,18 +247,10 @@ impl DeclarationOrder {
         AccessLevel::PackagePrivate
     }
 
-    fn has_static_modifier(&self, ctx: &CheckContext, node: &CstNode) -> bool {
+    fn has_static_modifier(&self, _ctx: &CheckContext, node: &CstNode) -> bool {
         for child in node.children() {
             if child.kind() == "modifiers" {
-                for modifier in child.children() {
-                    if modifier.kind() == "static"
-                        || (modifier.kind() == "modifier"
-                            && &ctx.source()[modifier.range()] == "static")
-                    {
-                        return true;
-                    }
-                }
-                return false;
+                return crate::rules::modifier::common::has_modifier(&child, "static");
             }
         }
         false

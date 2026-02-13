@@ -366,7 +366,7 @@ impl HiddenField {
     fn has_static_modifier(&self, node: &CstNode) -> bool {
         for child in node.children() {
             if child.kind() == "modifiers" {
-                return child.children().any(|m| m.kind() == "static");
+                return crate::rules::modifier::common::has_modifier(&child, "static");
             }
         }
         false

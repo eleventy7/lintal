@@ -179,7 +179,7 @@ impl StaticVariableName {
             return false;
         };
 
-        modifiers.children().any(|c| c.kind() == "static")
+        crate::rules::modifier::common::has_modifier(&modifiers, "static")
     }
 
     /// Check if the field has a final modifier.
@@ -188,7 +188,7 @@ impl StaticVariableName {
             return false;
         };
 
-        modifiers.children().any(|c| c.kind() == "final")
+        crate::rules::modifier::common::has_modifier(&modifiers, "final")
     }
 
     /// Check if the field is inside an interface or annotation declaration.
@@ -209,9 +209,9 @@ impl StaticVariableName {
         let modifiers = node.children().find(|c| c.kind() == "modifiers");
 
         let (has_public, has_protected, has_private) = if let Some(ref mods) = modifiers {
-            let public = mods.children().any(|c| c.kind() == "public");
-            let protected = mods.children().any(|c| c.kind() == "protected");
-            let private = mods.children().any(|c| c.kind() == "private");
+            let public = crate::rules::modifier::common::has_modifier(mods, "public");
+            let protected = crate::rules::modifier::common::has_modifier(mods, "protected");
+            let private = crate::rules::modifier::common::has_modifier(mods, "private");
             (public, protected, private)
         } else {
             (false, false, false)

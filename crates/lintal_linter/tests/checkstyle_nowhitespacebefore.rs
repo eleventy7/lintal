@@ -402,15 +402,13 @@ fn test_no_whitespace_before_ellipsis() {
     print_violations("Actual violations", &violations);
 
     // Expected violations from checkstyle test
-    // Note: Lines with type annotations before ellipsis (25, 31, 34) are not currently detected
-    // due to how tree-sitter-java parses type annotations in varargs parameters.
-    // The tree-sitter parser may not create token nodes where expected when annotations
-    // appear in complex type declarations. This is a known limitation.
+    // tree-sitter-java-orchard correctly parses type annotations in varargs parameters,
+    // so all violations are now detected.
     let expected = vec![
-        // (25, "..."), // @C [] @B ... arg - NOT DETECTED (annotation before ellipsis)
-        (28, "..."), // @C []    ... arg - DETECTED (no annotation before ellipsis)
-                     // (31, "..."), // [] @B ... arg - NOT DETECTED (annotation before ellipsis)
-                     // (34, "..."), // [] @B ... arg - NOT DETECTED (annotation before ellipsis)
+        (25, "..."), // @C [] @B ... arg
+        (28, "..."), // @C []    ... arg
+        (31, "..."), // [] @B ... arg
+        (34, "..."), // [] @B ... arg
     ];
 
     for (line, token) in &expected {
@@ -438,10 +436,7 @@ fn test_no_whitespace_before_ellipsis() {
             .collect::<Vec<_>>()
     );
 
-    println!(
-        "Test passed: found {} violations (note: some cases with type annotations not detected due to parser limitations)",
-        violations.len()
-    );
+    println!("Test passed: found {} violations", violations.len());
 }
 
 // =============================================================================

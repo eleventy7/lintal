@@ -416,8 +416,8 @@ impl<'a> FinalLocalVariableVisitor<'a> {
                 if super::common::has_modifier(&child, "final") {
                     return; // Already final, skip
                 }
-            } else if child.kind() == "final" {
-                // Sometimes final appears directly as a child
+            } else if super::common::resolve_modifier_kind(&child) == "final" {
+                // Sometimes final appears directly as a child (or wrapped in modifier node)
                 return;
             }
         }
@@ -641,7 +641,7 @@ impl<'a> FinalLocalVariableVisitor<'a> {
                 if child.kind() == "modifiers" {
                     has_final = super::common::has_modifier(&child, "final");
                     break;
-                } else if child.kind() == "final" {
+                } else if super::common::resolve_modifier_kind(&child) == "final" {
                     has_final = true;
                     break;
                 }
